@@ -7,10 +7,10 @@ export class ApproveTransaction {
         this.repository = repository;
     }
 
-    async execute(transactionId: string, reason: string): Promise<boolean> {
+    async execute(transactionId: string, reason: string, analystName?: string): Promise<boolean> {
         if (!reason || reason.trim().length === 0) {
             throw new Error("Onay işlemi için gerekçe belirtilmesi zorunludur.");
         }
-        return await this.repository.approveTransaction(transactionId, reason);
+        return await this.repository.approveTransaction(transactionId, reason, analystName);
     }
 }

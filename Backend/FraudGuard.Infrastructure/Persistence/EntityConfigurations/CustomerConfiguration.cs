@@ -14,6 +14,12 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             
             builder.Property(c => c.IdentityNumber).IsRequired().HasMaxLength(11);
             builder.HasIndex(c => c.IdentityNumber).IsUnique(); 
+            builder.Property(c => c.PhoneNumber)
+                   .HasMaxLength(20)
+                   .IsRequired(false);
+            builder.Property(c => c.Email)
+                   .HasMaxLength(100)
+                   .IsRequired(false);
         }
     }
 }

@@ -25,30 +25,31 @@ export function useTransactions() {
     const [loading, setLoading] = useState<boolean>(true);
 
     const fetchTransactions = useCallback(async () => {
-        // Arka planda sessiz yenileme yaparken ekranda "Yükleniyor" titremesi olmasın diye
-        // sadece liste tamamen boşsa loading'i true yapabiliriz.
-        setLoading(prev => transactions.length === 0 ? true : prev);
-        
+        // 'transactions.length' bağımlılığını kaldırmak için setLoading doğrudan ayarlanabilir
+        // veya listede hiç veri yoksa loading gösterimi daha farklı yönetilebilir:
+        setLoading(prev => prev);
+
         try {
             const data = await getPendingUseCase.execute();
             setTransactions(data);
 
             const historyData = await repository.getHistoricalTransactions();
-            
+
             const formattedHistory: HistoryLog[] = historyData.map(h => ({
                 transaction: h.transaction,
                 action: h.action,
                 reason: h.transaction.suspicionReason || "Admin Aksiyonu",
                 timestamp: new Date(h.transaction.date)
             }));
-            
+
             setHistory(formattedHistory);
         } catch (error) {
             console.error("Veriler çekilirken hata:", error);
         } finally {
             setLoading(false);
         }
-    }, [transactions.length]);
+    }, []); // 🟢 Bağımlılık dizisini boş bıraktık. Böylece referansı sabit kalır ve SignalR bağlantısı kopmaz.
+
 
     // --- SİGNALR BAĞLANTISI VE DİNLEME MANTIĞI BURADA ---
     useEffect(() => {
@@ -88,19 +89,17 @@ export function useTransactions() {
         }
     };
 
-    const handleApprove = async (id: string, reason: string) => {
+    const handleApprove = async (id: string, reason: string, analystName?: string) => {
         addToHistory(id, 'APPROVED', reason);
         setTransactions(prev => prev.filter(t => t.id !== id));
-
-        await approveUseCase.execute(id, reason);
-        await fetchTransactions(); 
+        await approveUseCase.execute(id, reason, analystName);
+        await fetchTransactions();
     };
 
-    const handleBlock = async (id: string, reason: string, blockReasonId?: number) => {
+    const handleBlock = async (id: string, reason: string, blockReasonId?: number, analystName?: string) => {
         addToHistory(id, 'BLOCKED', reason);
         setTransactions(prev => prev.filter(t => t.id !== id));
-
-        await blockUseCase.execute(id, reason, blockReasonId);
+        await blockUseCase.execute(id, reason, blockReasonId, analystName);
         await fetchTransactions();
     };
 
@@ -112,5 +111,15 @@ export function useTransactions() {
         await fetchTransactions();
     };
 
-    return { transactions, history, loading, handleApprove, handleBlock, handleBulkBlock };
+    const handleBulkApprove = async (ids: string[], reason: string, analystName?: string) => {
+        ids.forEach(id => addToHistory(id, 'APPROVED', reason));
+        setTransactions(prev => prev.filter(t => !ids.includes(t.id)));
+        for (const id of ids) {
+            await approveUseCase.execute(id, reason, analystName);
+        }
+        await fetchTransactions();
+    };
+
+
+    return { transactions, history, loading, handleApprove, handleBlock, handleBulkBlock, handleBulkApprove };
 }

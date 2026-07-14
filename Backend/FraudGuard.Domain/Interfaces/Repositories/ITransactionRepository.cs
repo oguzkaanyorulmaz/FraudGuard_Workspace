@@ -9,5 +9,8 @@ namespace FraudGuard.Domain.Interfaces.Repositories
     {
         Task AddAsync(ETransaction transaction);
         Task<List<ETransaction>> GetRecentTransactionsAsync(int cardId, TimeSpan timeWindow);
+        Task<bool> HasAnySuspiciousTransactionAsync(int cardId);
+        Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId);
+
     }
 }

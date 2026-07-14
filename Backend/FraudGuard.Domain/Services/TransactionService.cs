@@ -40,6 +40,14 @@ namespace FraudGuard.Domain.Services
                 return result;
             }
 
+            bool hasSuspicious = await _transactionRepository.HasAnySuspiciousTransactionAsync(card.CardId);
+            if (hasSuspicious)
+            {
+                result.Status = "Declined";
+                result.DeclineReason = "Kart şüpheli durumda, müşteri hizmetlerini arayınız.";
+                return result;
+            }
+
             if (card.IsBlocked)
             {
                 result.Status = "Declined";
@@ -66,13 +74,13 @@ namespace FraudGuard.Domain.Services
             // =================================================================
             // YENİ MİMARİ: Kategoriye Göre İşlem (1: Sale, 2: Refund, 3: Void)
             // =================================================================
-            if (input.CategoryId == 2 || input.CategoryId == 3)
+            if ((int)input.TransactionType == 2 || (int)input.TransactionType == 3)
             {
                 // İade veya İptal işlemi: Limiti geri yükle, Fraud kontrolüne sokma
                 result.Status = "Approved";
-                card.AvailableLimit += processedAmount; // Asıl limite dokunmuyoruz, kullanılabilir limiti artırıyoruz
+                card.AvailableLimit += processedAmount;
             }
-            else if (input.CategoryId == 1)
+            else if ((int)input.TransactionType == 1)
             {
                 // Satış İşlemi: Önce bakiye kontrolü yap
                 if (result.Status == "Approved" && card.AvailableLimit < processedAmount)
@@ -80,7 +88,6 @@ namespace FraudGuard.Domain.Services
                     result.Status = "Declined";
                     result.DeclineReason = "Yetersiz Bakiye";
                 }
-
                 // Bakiye yeterliyse Fraud (Sahtekarlık) kontrolüne gönder
                 if (result.Status == "Approved")
                 {
@@ -90,7 +97,6 @@ namespace FraudGuard.Domain.Services
                     capturedFraudReason = evaluationResult.FraudReason;
                     
                     isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
-
                     if (isSuspicious)
                     {
                         result.Status = "Suspicious";
@@ -110,7 +116,6 @@ namespace FraudGuard.Domain.Services
             {
                 CardId = card.CardId,
                 TransactionTypeId = (int)input.TransactionType,
-                CategoryId = input.CategoryId, // Yeni Foreign Key bağlantımız eklendi
                 Amount = input.Amount,
                 Currency = input.Currency,
                 TransactionDate = DateTime.Now,

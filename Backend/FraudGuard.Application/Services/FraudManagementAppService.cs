@@ -16,12 +16,14 @@ namespace FraudGuard.Application.Services
         private readonly IAdminOperationService _adminOperationService;
         private readonly IMapper _mapper;
         private readonly IFraudLogRepository _fraudLogRepository;
+        private readonly ITransactionRepository _transactionRepository;
 
-        public FraudManagementAppService(IAdminOperationService adminOperationService, IMapper mapper, IFraudLogRepository fraudLogRepository)
+        public FraudManagementAppService(IAdminOperationService adminOperationService, IMapper mapper, IFraudLogRepository fraudLogRepository, ITransactionRepository transactionRepository)
         {
             _adminOperationService = adminOperationService;
             _mapper = mapper;
             _fraudLogRepository = fraudLogRepository;
+            _transactionRepository = transactionRepository;
         }
 
         public async Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetUnresolvedLogsAsync()
@@ -69,7 +71,8 @@ namespace FraudGuard.Application.Services
                 request.LogId, 
                 request.AdminAction, 
                 request.AdminNote, 
-                request.BlockReasonId
+                request.BlockReasonId,
+                request.ResolvedByAdmin
             );
             
             if (result)
@@ -77,21 +80,19 @@ namespace FraudGuard.Application.Services
             
             return ResponseDTO<bool>.Fail("Log çözümlenirken bir hata oluştu veya log bulunamadı.");
         }
+
         public async Task<ResponseDTO<GetFraudLogDetailResponse>> GetLogDetailAsync(int logId)
         {
             var logEntity = await _fraudLogRepository.GetLogWithDetailsAsync(logId);
-
             if (logEntity == null)
             {
                 return ResponseDTO<GetFraudLogDetailResponse>.Fail("Log detayları bulunamadı.");
             }
-
+            var recentTxList = await _transactionRepository.GetLast10TransactionsForCardAsync(logEntity.Transaction.CardId, logEntity.TransactionId);
             var detail = new GetFraudLogDetailResponse
-            
             {
                 LogId = logEntity.LogId, 
                 TransactionId = logEntity.TransactionId,
-                
                 Amount = logEntity.Transaction.Amount,
                 Currency = logEntity.Transaction.Currency,
                 TransactionDate = logEntity.Transaction.TransactionDate,
@@ -100,16 +101,35 @@ namespace FraudGuard.Application.Services
                 
                 MaskedCardNumber = logEntity.Transaction.CreditCard.CardNumber, 
                 CardLimit = logEntity.Transaction.CreditCard.CardLimit,
+                AvailableLimit = logEntity.Transaction.CreditCard.AvailableLimit,
                 IsCardBlocked = logEntity.Transaction.CreditCard.IsBlocked,
+                AdminNote = logEntity.AdminNote,
+                ResolvedByAdmin = logEntity.ResolvedByAdmin,
                 
                 CustomerFullName = $"{logEntity.Transaction.CreditCard.Customer.FirstName} {logEntity.Transaction.CreditCard.Customer.LastName}",
                 IdentityNumber = logEntity.Transaction.CreditCard.Customer.IdentityNumber,
+                PhoneNumber = logEntity.Transaction.CreditCard.Customer.PhoneNumber, 
                 
-                RuleName = "Para Birimi Anormalliği",
-                SuspicionReason = "Müşteri geçmişinde işlem kaydı bulunmuyor.",
-                FraudReason = logEntity.Transaction.FraudReason
+                RuleName = logEntity.FraudRule?.RuleName ?? "Genel Şüpheli İşlem",
+                SuspicionReason = logEntity.Transaction.FraudReason ?? "Sistem tarafından şüpheli bulundu.",
+                FraudReason = logEntity.Transaction.FraudReason,
+                
+                RecentTransactions = recentTxList.Select(t => new CardRecentTransactionDto
+                {
+                    Amount = t.Amount,
+                    Currency = t.Currency,
+                    Location = t.Location,
+                    Country = t.Country,
+                    TransactionDate = t.TransactionDate,
+                    MerchantCategory = t.MerchantCategory,
+                    Status = t.Status,
+                    
+                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    
+                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null
+                }).ToList()
             };
-
             return ResponseDTO<GetFraudLogDetailResponse>.Success(detail);
         }
 

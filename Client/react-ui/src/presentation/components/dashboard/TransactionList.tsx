@@ -5,7 +5,7 @@ import { TransactionRow } from './TransactionRow';
 interface Props {
     transactions: { transaction: Transaction; historyAction?: 'APPROVED' | 'BLOCKED' }[];
     loading: boolean;
-    isHistoryView?: boolean;    
+    isHistoryView?: boolean;
     selectedIds: string[];
     onToggleSelection: (id: string) => void;
     onSelectAll: (ids: string[]) => void;
@@ -30,9 +30,9 @@ export const TransactionList: React.FC<Props> = ({
     if (transactions.length === 0) return <div className="bg-gray-900 rounded-b-xl border border-gray-800 p-12 text-center shadow-2xl"><div className="text-emerald-400 font-bold text-lg">🎉 Harika! Kayıt bulunmuyor.</div></div>;
 
     return (
-        <div className="bg-gray-900 rounded-b-xl border border-gray-800 overflow-hidden shadow-2xl">
+        <div className="bg-white rounded-xl border border-[#E4E7EB] overflow-hidden shadow-sm">
             <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-gray-950 text-gray-400 font-semibold border-y border-gray-800 uppercase text-xs tracking-wider">
+                <thead className="bg-[#F8F9FA] text-[#718096] font-bold border-b border-[#E4E7EB] uppercase text-[11px] tracking-wider">
                     <tr>
                         <th className="p-4 w-12 text-center">
                             {!isHistoryView && <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 rounded accent-blue-600 cursor-pointer" />}

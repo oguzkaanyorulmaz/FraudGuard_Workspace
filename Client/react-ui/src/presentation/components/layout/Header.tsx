@@ -2,18 +2,20 @@ import React from 'react';
 
 export const Header: React.FC = () => {
     return (
-        <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
-            <div>
-                <h1 className="text-2xl font-black tracking-wider flex items-center gap-2 text-yellow">
-                    🛡️ FRAUDGUARD <span className="text-xs bg-blue-600/20 text-blue-400 font-semibold px-2.5 py-1 rounded-full border border-blue-500/30">13.07.2026</span>
-                </h1>
-            </div>
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 bg-red-950/40 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> CANLI AKIŞ AKTİF
+        <div className="flex justify-between items-center mb-8 border-b border-[#E4E7EB] pb-5">
+            <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 font-sans">
+                    <span className="bg-[#FFC72C] text-[#111] font-black italic text-xl px-2.5 py-0.5 rounded shadow-sm">FG</span>
+                    <span className="text-xl font-bold tracking-tight text-[#111]">FraudGuard</span>
                 </div>
-                <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 px-3 py-1.5 rounded-lg text-xs">
-                    <span className="text-gray-400">👤 Analist:</span> <span className="font-medium text-blue-400">Oğuz Kaan</span>
+            </div>
+            <div className="flex items-center gap-3">
+                {/* 🔴 Canlı Akış Aktif uyarısı kırmızı yapıldı */}
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-600 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span> CANLI AKIŞ AKTİF
+                </div>
+                <div className="flex items-center gap-2 bg-[#111111] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-black transition cursor-pointer">
+                    <span>👤 Analist: Oğuz Kaan</span>
                 </div>
             </div>
         </div>

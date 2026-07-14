@@ -2,68 +2,32 @@
 
 export const theme = {
     colors: {
-        primary: "#FFC72C",          // VakıfBank Sarısı
-        primaryHover: "#F4B400",
-        black: "#1B1B1B",
+        primary: "#FFC72C",          // Sarı Vurgu
+        primaryHover: "#E5B224",
+        black: "#111111",            // Siyah Buton ve Metin Rengi
         white: "#FFFFFF",
-
-        bg: "#F8F8F8",
-        card: "#FFFFFF",
-
-        border: "#E7E7E7",
-
-        text: "#222222",
-        muted: "#707070",
-
+        bg: "#F4F5F7",               // Temiz Arka Plan
+        card: "#FFFFFF",             // Beyaz Kartlar
+        border: "#E4E7EB",           // İnce Sınırlar
+        text: "#1A1D20",
+        muted: "#718096",
         success: "#16A34A",
         danger: "#DC2626"
     },
 
     styles: {
-
-        body:
-            "min-h-screen bg-[#F8F8F8] text-[#222] font-sans flex overflow-hidden",
-
-        card:
-            "bg-white border border-[#E7E7E7] rounded-xl shadow-sm transition-all duration-300 hover:shadow-lg",
-
-        cardTitle:
-            "uppercase text-xs font-bold tracking-wider text-[#6F6F6F]",
-
-        cardValue:
-            "text-4xl font-black text-[#222]",
-
-        filterSection:
-            "bg-white border border-[#E7E7E7] rounded-xl p-5 shadow-sm",
-
-        tabContainer:
-            "flex gap-2",
-
-        tabActive:
-            "px-6 py-3 rounded-lg bg-[#FFC72C] text-[#111] font-bold border border-[#FFC72C]",
-
-        tabInactive:
-            "px-6 py-3 rounded-lg bg-white text-[#222] border border-[#FFC72C] hover:bg-[#FFF6D8] transition",
-
-        select:
-            "bg-white border border-[#D8D8D8] rounded-lg px-4 py-2 text-[#222] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/20",
-
-        input:
-            "bg-white border border-[#D8D8D8] rounded-lg px-4 py-2 text-[#222] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/20",
-
-        /** Sarı kenarlıklı buton (Müşteri Ol tarzı) */
-
-        outlineButton:
-            "bg-white border-2 border-[#FFC72C] text-[#111] rounded-lg px-5 py-2 font-semibold hover:bg-[#FFF8DA] transition",
-
-        /** Siyah buton (İnternet Bankacılığı tarzı) */
-
-        blackButton:
-            "bg-[#111111] text-white rounded-lg px-5 py-2 font-semibold hover:bg-black transition",
-
-        /** Sarı buton */
-
-        primaryButton:
-            "bg-[#FFC72C] text-[#111] rounded-lg px-5 py-2 font-bold hover:bg-[#F4B400] transition"
+        body: "min-h-screen bg-[#F4F5F7] text-[#1A1D20] font-sans flex flex-col antialiased selection:bg-[#FFC72C]/30 selection:text-[#111]",
+        card: "relative overflow-hidden bg-white border border-[#E4E7EB] rounded-xl p-6 shadow-sm transition-all duration-300 hover:shadow-md",
+        cardTitle: "text-xs font-bold tracking-widest text-[#718096] uppercase",
+        cardValue: "text-3xl font-black text-[#111] mt-2",
+        filterSection: "bg-white border border-[#E4E7EB] rounded-xl p-5 shadow-sm",
+        tabContainer: "flex gap-5 border-b border-[#E4E7EB] pb-0",
+        tabActive: "px-2 py-3 text-sm font-bold text-[#111] border-b-4 border-[#FFC72C] transition-all relative top-[1px]",
+        tabInactive: "px-2 py-3 text-sm font-semibold text-[#718096] hover:text-[#111] transition-all",
+        select: "bg-white border border-[#C5CBD3] rounded-lg px-4 py-2 text-[#1A1D20] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/20 transition-all text-sm outline-none",
+        input: "bg-white border border-[#C5CBD3] rounded-lg px-4 py-2 text-[#1A1D20] placeholder-[#718096] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/20 transition-all text-sm outline-none w-64",
+        outlineButton: "bg-white border border-[#FFC72C] text-[#111] rounded-lg px-5 py-2 font-semibold hover:bg-[#FFC72C]/10 transition-all text-sm",
+        blackButton: "bg-[#111111] text-white rounded-lg px-5 py-2 font-semibold hover:bg-black transition-all text-sm",
+        primaryButton: "bg-[#FFC72C] text-[#111] rounded-lg px-5 py-2 font-bold hover:bg-[#E5B224] transition-all text-sm"
     }
 };

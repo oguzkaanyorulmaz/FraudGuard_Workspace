@@ -21,31 +21,31 @@ export class ApiTransactionRepo implements ITransactionRepository {
 
         return dataList.map((item: any) => new Transaction({
             id: item.logId ? item.logId.toString() : (item.id ? item.id.toString() : "0"),
+            transactionId: item.transactionId ? item.transactionId.toString() : "0",
             maskedCard: item.cardNumber || item.maskedCardNumber || "Bilinmiyor",
             money: new Money(item.amount || 0, item.currency || "TRY"),
-            
+
             riskScore: item.riskScore || 0,
-            
+
             suspicionReason: item.reason || item.suspicionReason || "Belirtilmemiş",
             ruleName: item.ruleName || "Bilinmeyen Kural",
             location: item.location || "Bilinmiyor",
             date: item.createdAt || item.date || new Date().toISOString(),
-            
+
             fraudReason: item.fraudReason || undefined
         }));
     }
 
-    async approveTransaction(id: string, reason: string): Promise<boolean> {
+    async approveTransaction(id: string, reason: string, analystName?: string): Promise<boolean> {
         const numericId = parseInt(id.replace(/\D/g, ''), 10);
-        console.log("C# API'ye Gönderilen Paket:", { logId: numericId, adminAction: "MarkAsSafe", adminNote: reason });
-
         const response = await fetch(`${this.fraudManagementUrl}/resolve-log`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                logId: numericId, 
+            body: JSON.stringify({
+                logId: numericId,
                 adminAction: "MarkAsSafe",
-                adminNote: reason
+                adminNote: reason,
+                resolvedByAdmin: analystName
             })
         });
 
@@ -57,17 +57,17 @@ export class ApiTransactionRepo implements ITransactionRepository {
         return response.ok;
     }
 
-    async blockCard(id: string, reason: string, blockReasonId?: number): Promise<boolean> {
+    async blockCard(id: string, reason: string, blockReasonId?: number, analystName?: string): Promise<boolean> {
         const numericId = parseInt(id.replace(/\D/g, ''), 10);
-
         const response = await fetch(`${this.fraudManagementUrl}/resolve-log`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                logId: numericId, 
+            body: JSON.stringify({
+                logId: numericId,
                 adminAction: "MarkAsFraud",
                 adminNote: reason,
-                blockReasonId: blockReasonId
+                blockReasonId: blockReasonId,
+                resolvedByAdmin: analystName
             })
         });
 
@@ -84,7 +84,7 @@ export class ApiTransactionRepo implements ITransactionRepository {
             await this.blockCard(id, reason);
         }
     }
-    
+
     async getLogDetailById(logId: number): Promise<any> {
         const response = await fetch(`${this.fraudManagementUrl}/log-detail/${logId}`);
         if (!response.ok) throw new Error('Detaylar çekilirken hata oluştu!');
@@ -109,6 +109,7 @@ export class ApiTransactionRepo implements ITransactionRepository {
             return {
                 transaction: new Transaction({
                     id: item.logId ? item.logId.toString() : (item.id ? item.id.toString() : "0"),
+                    transactionId: item.transactionId ? item.transactionId.toString() : "0",
                     maskedCard: item.cardNumber || item.maskedCardNumber || "Bilinmiyor",
                     money: new Money(item.amount || 0, item.currency || "TRY"),
                     riskScore: item.riskScore || 0,

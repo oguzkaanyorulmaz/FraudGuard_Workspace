@@ -12,6 +12,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
     public class TransactionRepository : ITransactionRepository
     {
         private readonly FraudGuardDbContext _context;
+        
 
         public TransactionRepository(FraudGuardDbContext context)
         {
@@ -31,5 +32,20 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .Where(t => t.CardId == cardId && t.TransactionDate >= cutoffTime)
                 .ToListAsync();
         }
+        public async Task<bool> HasAnySuspiciousTransactionAsync(int cardId)
+        {
+            return await _context.Transactions.AnyAsync(t => t.CardId == cardId && t.Status == "Suspicious");
+        }
+        public async Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId)
+        {
+            return await _context.Transactions
+                .Include(t => t.FraudLog)
+                    .ThenInclude(fl => fl.FraudRule)
+                .Where(t => t.CardId == cardId && t.TransactionId != excludeTransactionId)
+                .OrderByDescending(t => t.TransactionDate)
+                .Take(10)
+                .ToListAsync();
+        }
+
     }
 }

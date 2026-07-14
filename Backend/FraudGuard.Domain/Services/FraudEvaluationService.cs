@@ -32,9 +32,9 @@ namespace FraudGuard.Domain.Services
             // ==========================================
             // GÜVENLİK DUVARI: İade/İptal İşlemlerini Reddet
             // ==========================================
-            if (input.CategoryId == 2 || input.CategoryId == 3)
+            if ((int)input.TransactionType == 2 || (int)input.TransactionType == 3)
             {
-                return (null, null); // İade işlemleri risk taşımaz, kuralları çalıştırmaya gerek yok
+                return (null, null); // İade/İptal işlemleri risk taşımaz
             }
 
             var recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(cardId, TimeSpan.FromHours(24));

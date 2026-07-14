@@ -44,7 +44,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(); 
 builder.Services.AddSignalR();
 
-// 🔴 SİGNALR İÇİN DEĞİŞTİRİLEN KISIM
+// CORS Configuration for SignalR
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
@@ -66,14 +66,14 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<FraudGuardDbContext>();
 // Migrate yerine EnsureCreated kullanıyoruz. Bu komut modellere bakıp tüm tabloları anında yaratır.
         context.Database.EnsureCreated(); 
-        Console.WriteLine("🟢 Veritabanı ve tablolar kalıcı olarak oluşturuldu!");
+        Console.WriteLine("Veritabanı ve tablolar kalıcı olarak oluşturuldu!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine("🔴 Veritabanı oluşturulurken hata: " + ex.Message);
+        Console.WriteLine("Veritabanı oluşturulurken hata: " + ex.Message);
     }
 }
-// 🔴 EKLENEN KISIM: Yönlendirme ve Cors sırası SignalR için çok önemlidir
+// Yönlendirme ve Cors sırası SignalR için çok önemlidir
 app.UseRouting();
 app.UseCors("AllowReactApp");
 

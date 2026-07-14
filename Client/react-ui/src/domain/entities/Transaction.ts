@@ -2,11 +2,12 @@ import { Money } from '../value-objects/Money';
 
 export interface TransactionProps {
     id: string;
+    transactionId: string;
     maskedCard: string;
     money: Money;
-    ruleName: string; 
+    ruleName: string;
     suspicionReason: string;
-    riskScore: number; 
+    riskScore: number;
     location: string;
     date: string;
     fraudReason?: string;
@@ -22,14 +23,14 @@ export class Transaction {
     get id(): string { return this.props.id; }
     get maskedCard(): string { return this.props.maskedCard; }
     get money(): Money { return this.props.money; }
-    
+    get transactionId(): string { return this.props.transactionId; }
     get ruleName(): string { return this.props.ruleName; }
     get suspicionReason(): string { return this.props.suspicionReason; }
     get riskScore(): number { return this.props.riskScore; }
-    
+
     get location(): string { return this.props.location; }
     get date(): string { return this.props.date; }
-    
+
     // YENİ EKLENDİ: Sidebar'ın okuyabilmesi için Getter açtık
-    get fraudReason(): string | undefined { return this.props.fraudReason; } 
+    get fraudReason(): string | undefined { return this.props.fraudReason; }
 }

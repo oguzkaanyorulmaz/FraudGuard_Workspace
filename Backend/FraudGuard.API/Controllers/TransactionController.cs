@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using FraudGuard.Application.Interfaces;
 using FraudGuard.Application.DTOs.TransactionProcessing;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using FraudGuard.API.Hubs;
 
 namespace FraudGuard.API.Controllers
 {
@@ -10,10 +12,12 @@ namespace FraudGuard.API.Controllers
     public class TransactionController : ControllerBase
     {
         private readonly ITransactionAppService _transactionAppService;
+        private readonly IHubContext<FraudHub> _hubContext;
 
-        public TransactionController(ITransactionAppService transactionAppService)
+        public TransactionController(ITransactionAppService transactionAppService, IHubContext<FraudHub> hubContext)
         {
             _transactionAppService = transactionAppService;
+            _hubContext = hubContext;
         }
 
                 [HttpPost("process")]
@@ -22,6 +26,10 @@ namespace FraudGuard.API.Controllers
             try 
             {
                 var response = await _transactionAppService.ProcessAsync(request);
+                if (response.IsSuccess)
+                {
+                    await _hubContext.Clients.All.SendAsync("RefreshLogs");
+                }
                 return response.IsSuccess ? Ok(response) : BadRequest(response);
             }
             catch (Exception ex)

@@ -8,12 +8,12 @@ export class BlockCard {
     }
 
     // DİKKAT: blockReasonId parametresi eklendi
-    async execute(transactionId: string, reason: string, blockReasonId?: number): Promise<boolean> {
+    async execute(transactionId: string, reason: string, blockReasonId?: number, analystName?: string): Promise<boolean> {
         if (!reason || reason.trim().length === 0) {
             throw new Error("Bloke işlemi için resmi bir gerekçe yazılması zorunludur.");
         }
-        
+
         // Parametreyi Repo'ya iletiyoruz
-        return await this.repository.blockCard(transactionId, reason, blockReasonId);
+        return await this.repository.blockCard(transactionId, reason, blockReasonId, analystName);
     }
 }
