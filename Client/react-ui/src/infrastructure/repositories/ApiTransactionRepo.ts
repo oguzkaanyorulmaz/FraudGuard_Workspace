@@ -3,7 +3,6 @@ import { Transaction } from '../../domain/entities/Transaction';
 import { Money } from '../../domain/value-objects/Money';
 
 export class ApiTransactionRepo implements ITransactionRepository {
-    private readonly transactionsUrl = 'http://localhost:5217/api/transactions';
     private readonly fraudManagementUrl = 'http://localhost:5217/api/FraudManagement';
 
     async getPendingTransactions(): Promise<Transaction[]> {

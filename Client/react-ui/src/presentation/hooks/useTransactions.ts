@@ -72,7 +72,7 @@ export function useTransactions() {
                     fetchTransactions();
                 });
             })
-            .catch(err => console.error("🔴 SignalR Bağlantı Hatası:", err));
+            .catch((err: any) => console.error("🔴 SignalR Bağlantı Hatası:", err));
 
         // 4. Temizlik (Cleanup): Bileşen ekrandan kalkarsa bağlantıyı kapat
         return () => {

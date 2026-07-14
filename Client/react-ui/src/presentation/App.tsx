@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Transaction } from '../domain/entities/Transaction';
 import { Header } from './components/layout/Header';
 import { TransactionList } from './components/dashboard/TransactionList';
@@ -15,14 +15,7 @@ import { theme } from './styles/theme'; // Yeni eklenen tema importu
   text-white border-[#C5CBD3] focus:ring-[#FFCB05]/20 
 */
 
-// Bu satır Tailwind'in tüm theme.ts sınıflarını build'e dahil etmesini zorunlu kılar
-const _tailwindUsage = [
-    theme.styles.body,
-    theme.styles.card,
-    theme.styles.filterSection,
-    theme.styles.select,
-    theme.styles.input
-];
+
 
 export default function App() {
     const { transactions, history, loading, handleApprove, handleBlock, handleBulkBlock } = useTransactions();

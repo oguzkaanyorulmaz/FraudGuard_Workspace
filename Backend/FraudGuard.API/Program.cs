@@ -43,24 +43,44 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(); 
 builder.Services.AddSignalR();
+
+// 🔴 SİGNALR İÇİN DEĞİŞTİRİLEN KISIM
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAllOrigins", policy =>
+    options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:3000") // Sadece React arayüzüne izin veriyoruz
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials(); // SignalR'ın çalışması için kimlik onayı zorunludur
     });
 });
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<FraudGuardDbContext>();
+// Migrate yerine EnsureCreated kullanıyoruz. Bu komut modellere bakıp tüm tabloları anında yaratır.
+        context.Database.EnsureCreated(); 
+        Console.WriteLine("🟢 Veritabanı ve tablolar kalıcı olarak oluşturuldu!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("🔴 Veritabanı oluşturulurken hata: " + ex.Message);
+    }
+}
+// 🔴 EKLENEN KISIM: Yönlendirme ve Cors sırası SignalR için çok önemlidir
+app.UseRouting();
+app.UseCors("AllowReactApp");
 
-app.UseCors("AllowAllOrigins");
 app.MapHub<FraudHub>("/fraudHub");
+
 // Kalkanlar (Middleware)
 app.UseMiddleware<GlobalExceptionMiddleware>();
-
 
 if (app.Environment.IsDevelopment())
 {
