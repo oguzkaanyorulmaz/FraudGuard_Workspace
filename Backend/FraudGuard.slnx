@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="FraudGuard.API/FraudGuard.API.csproj" />
+  <Project Path="FraudGuard.Application/FraudGuard.Application.csproj" />
+  <Project Path="FraudGuard.Domain/FraudGuard.Domain.csproj" />
+  <Project Path="FraudGuard.Infrastructure/FraudGuard.Infrastructure.csproj" />
+</Solution>

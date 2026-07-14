@@ -1,0 +1,25 @@
+# Node (React/Frontend) bağımlılıkları
+**/node_modules/
+**/build/
+**/dist/
+
+# .NET (Backend) derleme çıktıları
+**/[Bb]in/
+**/[Oo]bj/
+
+# Veritabanı dosyaları
+*.mdf
+*.ldf
+*.sqlite
+*.db
+
+# IDE, İşletim Sistemi ve ortam dosyaları
+.vs/
+.vscode/
+*.env
+.DS_Store
+Thumbs.db
+
+# Log dosyaları ve Gereksiz Çalıştırılabilir Dosyalar
+*.log
+*.exe
