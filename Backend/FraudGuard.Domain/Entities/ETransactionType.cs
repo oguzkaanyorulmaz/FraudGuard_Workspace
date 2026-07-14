@@ -7,8 +7,6 @@ namespace FraudGuard.Domain.Entities
         public int TransactionTypeId { get; set; }
         public string TypeCode { get; set; }
         public string Description { get; set; }
-        public int LimitEffect { get; set; } 
-
         public ICollection<ETransaction> Transactions { get; set; }
     }
 }

@@ -16,15 +16,23 @@ namespace FraudGuard.API.Controllers
             _transactionAppService = transactionAppService;
         }
 
-        [HttpPost("process")]
+                [HttpPost("process")]
         public async Task<IActionResult> ProcessTransaction([FromBody] ProcessTransactionRequest request)
         {
-            var response = await _transactionAppService.ProcessAsync(request);
-            
-            if (response.IsSuccess)
-                return Ok(response);
-                
-            return BadRequest(response);
+            try 
+            {
+                var response = await _transactionAppService.ProcessAsync(request);
+                return response.IsSuccess ? Ok(response) : BadRequest(response);
+            }
+            catch (Exception ex)
+            {
+                // Hatayı tam burada yakalayıp konsola dökeceğiz
+                Console.WriteLine($"🚨 İŞLEM HATASI: {ex.Message}");
+                if (ex.InnerException != null) 
+                    Console.WriteLine($"🔍 INNER EXCEPTION: {ex.InnerException.Message}");
+                    
+                return StatusCode(500, new { message = "Hata detayına terminalden bak!", error = ex.Message });
+            }
         }
     }
 }

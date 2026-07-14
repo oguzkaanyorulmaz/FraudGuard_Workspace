@@ -10,6 +10,7 @@ namespace FraudGuard.Domain.Entities
         public string ExpiryDate { get; set; }
         public string CVV { get; set; }
         public decimal CardLimit { get; set; }
+        public decimal AvailableLimit { get; set; }
         public bool IsBlocked { get; set; } = false;
         
         public int? BlockReasonId { get; set; } 

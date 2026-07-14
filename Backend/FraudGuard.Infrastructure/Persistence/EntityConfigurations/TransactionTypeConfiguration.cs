@@ -14,7 +14,6 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             builder.HasIndex(t => t.TypeCode).IsUnique();
             
             builder.Property(t => t.Description).IsRequired().HasMaxLength(100);
-            builder.Property(t => t.LimitEffect).IsRequired();
         }
     }
 }

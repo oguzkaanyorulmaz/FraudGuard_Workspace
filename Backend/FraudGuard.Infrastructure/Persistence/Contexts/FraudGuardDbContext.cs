@@ -24,6 +24,11 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<EFraudLog>()
                 .ToTable(tb => tb.HasTrigger("trg_AfterFraudLogUpdate"));
+            modelBuilder.Entity<ETransactionCategory>().HasData(
+        new ETransactionCategory { CategoryId = 1, CategoryCode = "Sale", Description = "Satış İşlemi", LimitEffect = 1 },
+        new ETransactionCategory { CategoryId = 2, CategoryCode = "Refund", Description = "İade İşlemi", LimitEffect = -1 },
+        new ETransactionCategory { CategoryId = 3, CategoryCode = "Void", Description = "İptal İşlemi", LimitEffect = 0 }
+    );
         }
     }
 }

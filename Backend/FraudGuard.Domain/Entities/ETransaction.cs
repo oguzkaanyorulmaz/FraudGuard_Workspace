@@ -20,7 +20,9 @@ namespace FraudGuard.Domain.Entities
         public string? DeclineReason { get; set; }
         public string? FraudReason { get; set; }
         
-
+// Mevcut propertilerin arasına ekle
+        public int CategoryId { get; set; }
+        public virtual ETransactionCategory Category { get; set; }
         public ECreditCard CreditCard { get; set; }
         public ETransactionType TransactionType { get; set; }
         public EFraudLog FraudLog { get; set; }

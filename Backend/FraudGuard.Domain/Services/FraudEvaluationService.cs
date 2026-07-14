@@ -8,8 +8,6 @@ using System.Threading.Tasks;
 
 namespace FraudGuard.Domain.Services
 {
-    // DİKKAT: Artık sadece kural kodunu değil, FraudReason metnini de dönebilmek için 
-    // dönüş tipini Tuple (string RuleCode, string FraudReason) olarak güncelliyoruz.
     public class FraudEvaluationService : IFraudEvaluationService
     {
         private readonly ITransactionRepository _transactionRepository;
@@ -31,6 +29,14 @@ namespace FraudGuard.Domain.Services
 
         public async Task<(string? RuleCode, string? FraudReason)> EvaluateAsync(ProcessTransactionInput input, int cardId)
         {
+            // ==========================================
+            // GÜVENLİK DUVARI: İade/İptal İşlemlerini Reddet
+            // ==========================================
+            if (input.CategoryId == 2 || input.CategoryId == 3)
+            {
+                return (null, null); // İade işlemleri risk taşımaz, kuralları çalıştırmaya gerek yok
+            }
+
             var recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(cardId, TimeSpan.FromHours(24));
             var card = await _creditCardRepository.GetByIdAsync(cardId);
 
@@ -101,6 +107,7 @@ namespace FraudGuard.Domain.Services
             // ==========================================
             if (card != null && card.CardLimit > 0)
             {
+                // Max-Out kuralı, kartın toplam limitine (CardLimit) oranlanmalıdır
                 decimal limitUsagePercentage = (input.Amount / card.CardLimit) * 100;
                 if (limitUsagePercentage >= 95)
                     return ("MAX_OUT", "Tek seferde kart limitinin %95'ini veya daha fazlasını boşaltma denemesi.");

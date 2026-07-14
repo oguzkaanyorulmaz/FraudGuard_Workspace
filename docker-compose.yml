@@ -7,6 +7,7 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=FraudGuard2026_! # Senin şifrenle güncelledik
+      - MSSQL_DATABASE=FraudGuard
     ports:
       - "1433:1433"
     volumes:

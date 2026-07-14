@@ -36,7 +36,7 @@ export const TransactionRow: React.FC<Props> = ({
                 </div>
             </td>
             <td className="p-4 font-mono text-gray-500">#{transaction.id}</td>
-            <td className="p-4 font-mono">{transaction.maskedCard}</td>
+            <td className="p-4 font-mono text-white">{transaction.maskedCard}</td>
             {/* Not: Eğer money nesnesi de frontend'de değiştiyse burası transaction.amount şeklinde güncellenebilir */}
             <td className="p-4 font-black text-white">{transaction.money ? transaction.money.getFormatted() : '₺0.00'}</td>
             <td className="p-4">

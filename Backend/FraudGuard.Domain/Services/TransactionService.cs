@@ -60,44 +60,57 @@ namespace FraudGuard.Domain.Services
             else if (input.Currency == "EUR") processedAmount = input.Amount * 43;
 
             bool isSuspicious = false;
-            
             string? triggeredRuleCode = null;
             string? capturedFraudReason = null;
 
-            if (input.TransactionType == TransactionTypeEnum.Refund || input.TransactionType == TransactionTypeEnum.Void)
+            // =================================================================
+            // YENİ MİMARİ: Kategoriye Göre İşlem (1: Sale, 2: Refund, 3: Void)
+            // =================================================================
+            if (input.CategoryId == 2 || input.CategoryId == 3)
             {
+                // İade veya İptal işlemi: Limiti geri yükle, Fraud kontrolüne sokma
                 result.Status = "Approved";
-                card.CardLimit += processedAmount;
+                card.AvailableLimit += processedAmount; // Asıl limite dokunmuyoruz, kullanılabilir limiti artırıyoruz
             }
-            else if (input.TransactionType == TransactionTypeEnum.Sale)
+            else if (input.CategoryId == 1)
             {
-                if (result.Status == "Approved" && card.CardLimit < processedAmount)
+                // Satış İşlemi: Önce bakiye kontrolü yap
+                if (result.Status == "Approved" && card.AvailableLimit < processedAmount)
                 {
                     result.Status = "Declined";
                     result.DeclineReason = "Yetersiz Bakiye";
                 }
 
-                var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, card.CardId);
-                
-                triggeredRuleCode = evaluationResult.RuleCode;
-                capturedFraudReason = evaluationResult.FraudReason;
-                
-                isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
+                // Bakiye yeterliyse Fraud (Sahtekarlık) kontrolüne gönder
+                if (result.Status == "Approved")
+                {
+                    var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, card.CardId);
+                    
+                    triggeredRuleCode = evaluationResult.RuleCode;
+                    capturedFraudReason = evaluationResult.FraudReason;
+                    
+                    isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
 
-                if (isSuspicious)
-                {
-                    result.Status = "Suspicious";
-                }
-                else if (result.Status == "Approved")
-                {
-                    card.CardLimit -= processedAmount;
+                    if (isSuspicious)
+                    {
+                        result.Status = "Suspicious";
+                    }
+                    else
+                    {
+                        // Her şey temizse ve onaylandıysa bakiyeyi düş
+                        card.AvailableLimit -= processedAmount;
+                    }
                 }
             }
 
+            // =================================================================
+            // İŞLEMİ VERİTABANINA KAYDETME
+            // =================================================================
             var newTransaction = new ETransaction
             {
                 CardId = card.CardId,
                 TransactionTypeId = (int)input.TransactionType,
+                CategoryId = input.CategoryId, // Yeni Foreign Key bağlantımız eklendi
                 Amount = input.Amount,
                 Currency = input.Currency,
                 TransactionDate = DateTime.Now,
@@ -106,7 +119,6 @@ namespace FraudGuard.Domain.Services
                 MerchantCategory = input.MerchantCategory,
                 Status = result.Status,
                 DeclineReason = result.Status == "Suspicious" ? $"Fraud: {triggeredRuleCode}" : result.DeclineReason,
-                
                 FraudReason = capturedFraudReason 
             };
 
@@ -114,6 +126,7 @@ namespace FraudGuard.Domain.Services
             await _creditCardRepository.UpdateAsync(card);
             await _unitOfWork.SaveChangesAsync();
 
+            // Şüpheliyse log kaydı oluştur
             if (isSuspicious && triggeredRuleCode != null)
             {
                 await _fraudEvaluationService.CreateFraudLogAsync(newTransaction.TransactionId, triggeredRuleCode);
