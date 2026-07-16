@@ -142,6 +142,17 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                                     {tx.resolvedByAdmin && <div className="text-[9px] text-slate-400 font-semibold italic mt-0.5 align-self-end">Onaylayan: {tx.resolvedByAdmin}</div>}
                                                 </div>
                                             )}
+                                            {tx.declineReason && (
+                                                <div className={`mt-2 p-2 rounded border text-[10px] flex flex-col gap-1 ${
+                                                    tx.declineReason === 'Hatalı CVV' 
+                                                        ? 'bg-red-50 border-red-200 text-red-900' 
+                                                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                                                }`}>
+                                                    <div className="font-bold flex items-center gap-1">
+                                                        ❌ Red Nedeni: <span className={`font-semibold ${tx.declineReason === 'Hatalı CVV' ? 'text-red-700 font-bold' : 'text-slate-700'}`}>{tx.declineReason}</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ))
                                 ) : (

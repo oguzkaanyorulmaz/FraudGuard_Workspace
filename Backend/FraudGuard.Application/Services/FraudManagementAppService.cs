@@ -127,7 +127,8 @@ namespace FraudGuard.Application.Services
                     FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
                     AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
                     
-                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null
+                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    DeclineReason = t.DeclineReason
                 }).ToList()
             };
             return ResponseDTO<GetFraudLogDetailResponse>.Success(detail);

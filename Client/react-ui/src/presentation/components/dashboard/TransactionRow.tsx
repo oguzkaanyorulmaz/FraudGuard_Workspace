@@ -36,7 +36,10 @@ export const TransactionRow: React.FC<Props> = ({
             <td className="p-4 font-mono text-gray-600">#{transaction.transactionId}</td>
             <td className="p-4 font-mono text-black font-semibold">{transaction.maskedCard}</td>
             <td className="p-4 font-black text-black">{transaction.money ? transaction.money.getFormatted() : '₺0.00'}</td>
-            <td className="p-4">
+            <td className="p-4 text-xs text-slate-600 font-medium">
+                {new Date(transaction.date).toLocaleString('tr-TR')}
+            </td>
+            <td className="p-4 whitespace-normal break-words max-w-md">
                 <div className="flex flex-col">
                     <span className={`text-[11px] px-2 py-0.5 rounded font-bold w-max border mb-1 ${isHighRisk ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-800 border-amber-100'}`}>
                         {transaction.ruleName || 'SİSTEM UYARISI'}

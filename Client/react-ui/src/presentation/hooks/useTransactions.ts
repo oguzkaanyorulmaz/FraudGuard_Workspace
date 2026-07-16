@@ -103,11 +103,11 @@ export function useTransactions() {
         await fetchTransactions();
     };
 
-    const handleBulkBlock = async (ids: string[], reason: string) => {
+    const handleBulkBlock = async (ids: string[], reason: string, blockReasonId?: number, analystName?: string) => {
         ids.forEach(id => addToHistory(id, 'BLOCKED', reason));
         setTransactions(prev => prev.filter(t => !ids.includes(t.id)));
 
-        await processBulkUseCase.execute(ids, reason);
+        await processBulkUseCase.execute(ids, reason, blockReasonId, analystName);
         await fetchTransactions();
     };
 

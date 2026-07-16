@@ -73,13 +73,13 @@ public async Task<bool> ResolveFraudLogAsync(
 
     if ((adminAction == "CardBlocked" || adminAction == "MarkAsFraud" || adminAction == "BLOCK") && log.TransactionId > 0)
     {
-        if(log.Transaction != null && blockReasonId.HasValue)
+        if (log.Transaction != null)
         {
             var card = await _creditCardRepository.GetByIdAsync(log.Transaction.CardId);
             if (card != null)
             {
                 card.IsBlocked = true;
-                card.BlockReasonId = blockReasonId.Value; 
+                card.BlockReasonId = blockReasonId; 
                 await _creditCardRepository.UpdateAsync(card);
             }
         }

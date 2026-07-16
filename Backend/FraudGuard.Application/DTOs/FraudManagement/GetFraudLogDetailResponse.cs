@@ -42,5 +42,6 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public string? FraudSuspicionReason { get; set; }
         public string? AdminNote { get; set; }
         public string? ResolvedByAdmin { get; set; }
+        public string? DeclineReason { get; set; }
     }
 }

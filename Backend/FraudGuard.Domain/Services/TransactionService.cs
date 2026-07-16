@@ -80,16 +80,20 @@ namespace FraudGuard.Domain.Services
                 result.Status = "Approved";
                 card.AvailableLimit += processedAmount;
             }
-            else if ((int)input.TransactionType == 1)
+                        else if ((int)input.TransactionType == 1)
             {
+                bool isInitialDecline = result.Status == "Declined";
+
                 // Satış İşlemi: Önce bakiye kontrolü yap
-                if (result.Status == "Approved" && card.AvailableLimit < processedAmount)
+                if (!isInitialDecline && card.AvailableLimit < processedAmount)
                 {
                     result.Status = "Declined";
                     result.DeclineReason = "Yetersiz Bakiye";
+                    isInitialDecline = true;
                 }
-                // Bakiye yeterliyse Fraud (Sahtekarlık) kontrolüne gönder
-                if (result.Status == "Approved")
+
+                // Kart blokeli değilse, işlem her koşulda Fraud Değerlendirmesine tabi tutulur (Brute Force tespiti için)
+                if (!card.IsBlocked)
                 {
                     var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, card.CardId);
                     
@@ -101,6 +105,11 @@ namespace FraudGuard.Domain.Services
                     {
                         result.Status = "Suspicious";
                     }
+                    else if (isInitialDecline)
+                    {
+                        // Fraud tetiklenmediyse ve önceden hata varsa, status Declined kalır
+                        result.Status = "Declined";
+                    }
                     else
                     {
                         // Her şey temizse ve onaylandıysa bakiyeyi düş
@@ -108,6 +117,7 @@ namespace FraudGuard.Domain.Services
                     }
                 }
             }
+
 
             // =================================================================
             // İŞLEMİ VERİTABANINA KAYDETME

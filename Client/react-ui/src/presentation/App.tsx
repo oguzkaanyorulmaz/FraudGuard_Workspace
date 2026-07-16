@@ -21,9 +21,42 @@ export default function App() {
     const { selectedIds, toggleSelection, selectAll, clearSelection } = useSelection();
 
     // Arayüz Durumları (State)
-    const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING');
+    const [selectedTabs, setSelectedTabs] = useState<('PENDING' | 'BLOCKED' | 'APPROVED')[]>(['PENDING']);
     const [searchTerm, setSearchTerm] = useState('');
-    const [riskFilter, setRiskFilter] = useState('ALL');
+    const [selectedScenario, setSelectedScenario] = useState<string>('ALL');
+
+    const [sortFields, setSortFields] = useState<{ field: string; direction: 'asc' | 'desc' }[]>([
+        { field: 'date', direction: 'desc' }
+    ]);
+
+    const handleSort = (field: string) => {
+        setSortFields(prev => {
+            const isCompositeField = field === 'amount' || field === 'currency';
+            
+            if (!isCompositeField) {
+                const existing = prev.find(s => s.field === field);
+                if (existing) {
+                    return [{ field, direction: existing.direction === 'asc' ? 'desc' as const : 'asc' as const }];
+                }
+                return [{ field, direction: 'desc' as const }];
+            }
+
+            let newSorts = prev.filter(s => s.field === 'amount' || s.field === 'currency');
+            const existingIndex = newSorts.findIndex(s => s.field === field);
+            if (existingIndex > -1) {
+                const current = newSorts[existingIndex];
+                const updated = { 
+                    field: current.field, 
+                    direction: (current.direction === 'asc' ? 'desc' : 'asc') as 'asc' | 'desc'
+                };
+                const nextSorts = [...newSorts];
+                nextSorts[existingIndex] = updated;
+                return nextSorts;
+            } else {
+                return [...newSorts, { field, direction: 'asc' as 'asc' | 'desc' }];
+            }
+        });
+    };
 
 
     // Modal ve Sidebar Durumları
@@ -45,7 +78,7 @@ export default function App() {
             handleBlock(id, reason, blockReasonId, analystName);
         }
         else if (actionType === 'BULK_BLOCK') {
-            handleBulkBlock(selectedIds, reason);
+            handleBulkBlock(selectedIds, reason, blockReasonId, analystName);
             clearSelection();
         }
         else if (actionType === 'BULK_APPROVE') {
@@ -57,25 +90,132 @@ export default function App() {
         setActionType(null);
     };
 
-    // Filtreleme Mantığı
-    const getFilteredData = () => {
-        const sourceData = activeTab === 'PENDING'
-            ? transactions.map(t => ({ transaction: t }))
-            : history.map(h => ({ transaction: h.transaction, historyAction: h.action }));
-
-        return sourceData.filter(item => {
-            const txn = item.transaction;
-            if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
-            if (riskFilter !== 'ALL') {
-                const isHigh = txn.riskScore >= 70;
-                if (riskFilter === 'HIGH' && !isHigh) return false;
-                if (riskFilter === 'MEDIUM' && isHigh) return false;
+    const toggleTab = (tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
+        setSelectedTabs(prev => {
+            if (prev.includes(tab)) {
+                if (prev.length === 1) return prev; // En az bir tanesi seçili kalsın
+                return prev.filter(t => t !== tab);
+            } else {
+                return [...prev, tab];
             }
-            return true;
         });
     };
 
+    const handleTopCardClick = (tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
+        setSelectedTabs([tab]);
+        setSelectedScenario('ALL');
+        clearSelection();
+    };
+
+    const matchScenario = (txn: Transaction, scenario: string): boolean => {
+        if (scenario === 'ALL') return true;
+        
+        const ruleName = (txn.ruleName || '').toLowerCase();
+        const reason = (txn.suspicionReason || '').toLowerCase();
+        const fraudReason = (txn.fraudReason || '').toLowerCase();
+
+        switch (scenario) {
+            case 'BRUTE_FORCE':
+                return ruleName.includes('ardışık') || ruleName.includes('brute') || reason.includes('ardışık') || reason.includes('brute') || fraudReason.includes('ardışık') || fraudReason.includes('brute');
+            case 'IMPOSSIBLE_TRAVEL':
+                return ruleName.includes('seyahat') || ruleName.includes('travel') || reason.includes('seyahat') || reason.includes('travel') || fraudReason.includes('seyahat') || fraudReason.includes('travel');
+            case 'CARD_TESTING':
+                return ruleName.includes('deneme') || ruleName.includes('yoklama') || ruleName.includes('testing') || reason.includes('deneme') || reason.includes('yoklama') || reason.includes('testing') || fraudReason.includes('deneme') || fraudReason.includes('yoklama') || fraudReason.includes('testing');
+            case 'MAX_OUT':
+                return ruleName.includes('boşaltma') || ruleName.includes('max') || reason.includes('boşaltma') || reason.includes('max') || fraudReason.includes('boşaltma') || fraudReason.includes('max');
+            case 'ANOMALOUS_TIME':
+                return ruleName.includes('zaman') || ruleName.includes('saat') || ruleName.includes('time') || reason.includes('zaman') || reason.includes('saat') || reason.includes('time') || fraudReason.includes('zaman') || fraudReason.includes('saat') || fraudReason.includes('time');
+            case 'CROSS_BORDER':
+                return ruleName.includes('sınır') || ruleName.includes('cross') || reason.includes('sınır') || reason.includes('cross') || fraudReason.includes('sınır') || fraudReason.includes('cross');
+            case 'CURRENCY_MISMATCH':
+                return ruleName.includes('para birimi') || ruleName.includes('currency') || reason.includes('para birimi') || reason.includes('currency') || fraudReason.includes('para birimi') || fraudReason.includes('currency');
+            case 'HIGH_RISK_MCC':
+                return ruleName.includes('işyeri') || ruleName.includes('mcc') || reason.includes('işyeri') || reason.includes('mcc') || fraudReason.includes('işyeri') || fraudReason.includes('mcc');
+            case 'VELOCITY':
+                return ruleName.includes('hız') || ruleName.includes('velocity') || reason.includes('hız') || reason.includes('velocity') || fraudReason.includes('hız') || fraudReason.includes('velocity');
+            default:
+                return false;
+        }
+    };
+
+    // Filtreleme ve Sıralama Mantığı
+    const getFilteredData = () => {
+        let sourceData: { transaction: Transaction; historyAction?: 'APPROVED' | 'BLOCKED' }[] = [];
+
+        if (selectedTabs.includes('PENDING')) {
+            sourceData = [...sourceData, ...transactions.map(t => ({ transaction: t }))];
+        }
+        if (selectedTabs.includes('BLOCKED')) {
+            sourceData = [
+                ...sourceData,
+                ...history
+                    .filter(h => h.action === 'BLOCKED')
+                    .map(h => ({ transaction: h.transaction, historyAction: 'BLOCKED' as const }))
+            ];
+        }
+        if (selectedTabs.includes('APPROVED')) {
+            sourceData = [
+                ...sourceData,
+                ...history
+                    .filter(h => h.action === 'APPROVED')
+                    .map(h => ({ transaction: h.transaction, historyAction: 'APPROVED' as const }))
+            ];
+        }
+
+        const filtered = sourceData.filter(item => {
+            const txn = item.transaction;
+            if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
+            if (!matchScenario(txn, selectedScenario)) return false;
+            return true;
+        });
+
+        return [...filtered].sort((a, b) => {
+            for (const sort of sortFields) {
+                let valA: any;
+                let valB: any;
+
+                switch (sort.field) {
+                    case 'riskScore':
+                        valA = a.transaction.riskScore ?? 0;
+                        valB = b.transaction.riskScore ?? 0;
+                        break;
+                    case 'transactionId':
+                        valA = parseInt(a.transaction.transactionId || '0', 10);
+                        valB = parseInt(b.transaction.transactionId || '0', 10);
+                        break;
+                    case 'amount':
+                        valA = a.transaction.money?.getAmount() ?? 0;
+                        valB = b.transaction.money?.getAmount() ?? 0;
+                        break;
+                    case 'currency':
+                        valA = a.transaction.money?.getCurrency() || '';
+                        valB = b.transaction.money?.getCurrency() || '';
+                        break;
+                    case 'date':
+                        valA = new Date(a.transaction.date).getTime();
+                        valB = new Date(b.transaction.date).getTime();
+                        break;
+                    case 'action':
+                        valA = a.historyAction || 'PENDING';
+                        valB = b.historyAction || 'PENDING';
+                        break;
+                    default:
+                        continue;
+                }
+
+                if (valA < valB) return sort.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sort.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    };
+
+
     const filteredData = getFilteredData();
+
+    const isPendingActive = selectedTabs.length === 1 && selectedTabs.includes('PENDING');
+    const isBlockedActive = selectedTabs.length === 1 && selectedTabs.includes('BLOCKED');
+    const isApprovedActive = selectedTabs.length === 1 && selectedTabs.includes('APPROVED');
 
     return (
         <div className={theme.styles.body}>
@@ -85,57 +225,90 @@ export default function App() {
 
                 {/* Üst İstatistik Kartları */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-                    {/* 1. Bekleyen İşlemler - Siyah Çizgili & Siyah Yazılı */}
-                    <div className={theme.styles.card}>
+                    {/* 1. Bekleyen İşlemler - Siyah Çizgili */}
+                    <button
+                        onClick={() => handleTopCardClick('PENDING')}
+                        className={`${theme.styles.card} cursor-pointer text-left w-full hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 focus:outline-none ${isPendingActive
+                                ? 'bg-slate-100/80 font-semibold'
+                                : 'opacity-70 hover:opacity-100'
+                            }`}
+                    >
                         <div className="absolute top-0 left-0 w-full h-1 bg-[#111111]"></div>
                         <div className={theme.styles.cardTitle}>⬛ Bekleyen Şüpheli İşlem</div>
                         <div className="flex items-baseline gap-2 mt-2">
                             <span className="text-3xl font-black text-black">{transactions.length}</span>
                             <span className="text-xs text-red-500 font-bold animate-pulse">(Canlı)</span>
                         </div>
-                    </div>
-                    {/* 2. Blokelenen İşlemler - Kırmızı Çizgili & Kırmızı Yazılı */}
-                    <div className={theme.styles.card}>
+                    </button>
+                    {/* 2. Blokelenen İşlemler - Kırmızı Çizgili */}
+                    <button
+                        onClick={() => handleTopCardClick('BLOCKED')}
+                        className={`${theme.styles.card} cursor-pointer text-left w-full hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 focus:outline-none ${isBlockedActive
+                                ? 'bg-red-50/50 font-semibold'
+                                : 'opacity-70 hover:opacity-100'
+                            }`}
+                    >
                         <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
                         <div className={theme.styles.cardTitle}>🚫 Blokelenen İşlemler</div>
                         <div className="text-3xl font-black text-red-600 mt-2">{history.filter(h => h.action === 'BLOCKED').length}</div>
-                    </div>
-                    {/* 3. Onaylanan İşlemler - Yeşil Çizgili & Yeşil Yazılı */}
-                    <div className={theme.styles.card}>
+                    </button>
+                    {/* 3. Onaylanan İşlemler - Yeşil Çizgili */}
+                    <button
+                        onClick={() => handleTopCardClick('APPROVED')}
+                        className={`${theme.styles.card} cursor-pointer text-left w-full hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 focus:outline-none ${isApprovedActive
+                                ? 'bg-emerald-50/50 font-semibold'
+                                : 'opacity-70 hover:opacity-100'
+                            }`}
+                    >
                         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
                         <div className={theme.styles.cardTitle}>✅ Onaylanan İşlemler</div>
                         <div className="text-3xl font-black text-emerald-600 mt-2">{history.filter(h => h.action === 'APPROVED').length}</div>
-                    </div>
+                    </button>
                 </div>
+
 
                 {/* Filtreleme ve Tab Alanı */}
                 <div className={theme.styles.filterSection}>
                     <div className="flex flex-wrap justify-between items-center gap-4">
                         <div className={theme.styles.tabContainer}>
                             <button
-                                onClick={() => { setActiveTab('PENDING'); clearSelection(); }}
-                                className={activeTab === 'PENDING' ? theme.styles.tabActive : theme.styles.tabInactive}
+                                onClick={() => toggleTab('PENDING')}
+                                className={selectedTabs.includes('PENDING') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
                                 📂 Bekleyen ({transactions.length})
                             </button>
                             <button
-                                onClick={() => { setActiveTab('HISTORY'); clearSelection(); }}
-                                className={activeTab === 'HISTORY' ? theme.styles.tabActive : theme.styles.tabInactive}
+                                onClick={() => toggleTab('BLOCKED')}
+                                className={selectedTabs.includes('BLOCKED') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
-                                🗄️ Geçmiş İşlemler ({history.length})
+                                🚫 Blokelenen ({history.filter(h => h.action === 'BLOCKED').length})
+                            </button>
+                            <button
+                                onClick={() => toggleTab('APPROVED')}
+                                className={selectedTabs.includes('APPROVED') ? theme.styles.tabActive : theme.styles.tabInactive}
+                            >
+                                ✅ Onaylanan ({history.filter(h => h.action === 'APPROVED').length})
                             </button>
                         </div>
+
 
                         {/* Gelişmiş Filtreler */}
                         <div className="flex gap-3 text-sm">
                             <select
-                                value={riskFilter}
-                                onChange={(e) => setRiskFilter(e.target.value)}
+                                value={selectedScenario}
+                                onChange={(e) => setSelectedScenario(e.target.value)}
                                 className={theme.styles.select}
                             >
-                                <option value="ALL">Tüm Risk Seviyeleri</option>
-                                <option value="HIGH">Sadece Yüksek Risk (70+)</option>
-                                <option value="MEDIUM">Orta Risk (&lt;70)</option>
+                                <option value="ALL">Tüm Senaryolar</option>
+                                <option value="BRUTE_FORCE">Ardışık Red (Brute Force)</option>
+                                <option value="IMPOSSIBLE_TRAVEL">İmkansız Seyahat (Impossible Travel)</option>
+                                <option value="CARD_TESTING">Yoklama Çekimi (Card Testing)</option>
+                                <option value="MAX_OUT">Limit Boşaltma (Max-Out)</option>
+                                <option value="ANOMALOUS_TIME">Gece Sıradışı Tutar (Anomalous Time)</option>
+                                <option value="CROSS_BORDER">Sınır Ötesi İşlem (Cross Border)</option>
+                                <option value="CURRENCY_MISMATCH">Para Birimi Sapması (Currency)</option>
+                                <option value="HIGH_RISK_MCC">Yüksek Riskli MCC (İşyeri)</option>
+                                <option value="VELOCITY">Hız/Sıklık Kuralı (Velocity)</option>
                             </select>
                             <input
                                 type="text"
@@ -153,14 +326,16 @@ export default function App() {
                 <TransactionList
                     transactions={filteredData}
                     loading={loading}
-                    isHistoryView={activeTab === 'HISTORY'}
                     selectedIds={selectedIds}
                     onToggleSelection={toggleSelection}
                     onSelectAll={selectAll}
                     onApprove={openApproveModal}
                     onBlock={openBlockModal}
                     onViewDetails={setSidebarTxn}
+                    sortFields={sortFields}
+                    onSort={handleSort}
                 />
+
             </div>
 
             <ActionModal

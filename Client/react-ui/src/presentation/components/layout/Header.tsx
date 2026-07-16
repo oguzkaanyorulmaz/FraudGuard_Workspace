@@ -10,10 +10,6 @@ export const Header: React.FC = () => {
                 </div>
             </div>
             <div className="flex items-center gap-3">
-                {/* 🔴 Canlı Akış Aktif uyarısı kırmızı yapıldı */}
-                <div className="flex items-center gap-2 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-600 shadow-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span> CANLI AKIŞ AKTİF
-                </div>
                 <div className="flex items-center gap-2 bg-[#111111] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-black transition cursor-pointer">
                     <span>👤 Analist: Oğuz Kaan</span>
                 </div>

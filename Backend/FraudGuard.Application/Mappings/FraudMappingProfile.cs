@@ -14,7 +14,8 @@ namespace FraudGuard.Application.Mappings
                 .ForMember(dest => dest.RuleName, opt => opt.MapFrom(src => src.FraudRule.RuleName))
                 .ForMember(dest => dest.Amount, opt => opt.MapFrom(src => src.Transaction.Amount))
                 .ForMember(dest => dest.Currency, opt => opt.MapFrom(src => src.Transaction.Currency))
-                .ForMember(dest => dest.MaskedCardNumber, opt => opt.MapFrom(src => src.Transaction.CreditCard.CardNumber.MaskCardNumber()));
+                .ForMember(dest => dest.MaskedCardNumber, opt => opt.MapFrom(src => src.Transaction.CreditCard.CardNumber.MaskCardNumber()))
+                .ForMember(dest => dest.TransactionDate, opt => opt.MapFrom(src => src.Transaction.TransactionDate));
 
             CreateMap<EFraudRule, GetActiveRulesResponse>();
         }

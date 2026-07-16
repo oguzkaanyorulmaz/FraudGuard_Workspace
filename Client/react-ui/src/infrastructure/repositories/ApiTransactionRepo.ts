@@ -30,7 +30,7 @@ export class ApiTransactionRepo implements ITransactionRepository {
             suspicionReason: item.reason || item.suspicionReason || "Belirtilmemiş",
             ruleName: item.ruleName || "Bilinmeyen Kural",
             location: item.location || "Bilinmiyor",
-            date: item.createdAt || item.date || new Date().toISOString(),
+            date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
 
             fraudReason: item.fraudReason || undefined
         }));
@@ -116,7 +116,7 @@ export class ApiTransactionRepo implements ITransactionRepository {
                     suspicionReason: item.reason || item.suspicionReason || "Belirtilmemiş",
                     ruleName: item.ruleName || "Bilinmeyen Kural",
                     location: item.location || "Bilinmiyor",
-                    date: item.createdAt || item.date || new Date().toISOString(),
+                    date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
                     fraudReason: item.fraudReason || undefined
                 }),
                 action: historyAction

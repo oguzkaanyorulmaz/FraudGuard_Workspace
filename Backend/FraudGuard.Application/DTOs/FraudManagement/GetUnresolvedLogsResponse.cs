@@ -13,6 +13,7 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public string Currency { get; set; }
         public string MaskedCardNumber { get; set; }
         public DateTime LogDate { get; set; }
+        public DateTime TransactionDate { get; set; }
         public string? AdminAction { get; set; }
     }
 }
