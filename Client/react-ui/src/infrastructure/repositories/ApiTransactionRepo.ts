@@ -5,8 +5,25 @@ import { Money } from '../../domain/value-objects/Money';
 export class ApiTransactionRepo implements ITransactionRepository {
     private readonly fraudManagementUrl = 'http://localhost:5217/api/FraudManagement';
 
+    private getToken(): string {
+        try {
+            const stored = localStorage.getItem('fraudguard_user');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                return parsed.token || '';
+            }
+        } catch (e) {
+            console.error("Token okuma hatası", e);
+        }
+        return '';
+    }
+
     async getPendingTransactions(): Promise<Transaction[]> {
-        const response = await fetch(`${this.fraudManagementUrl}/unresolved-logs`);
+        const response = await fetch(`${this.fraudManagementUrl}/unresolved-logs`, {
+            headers: {
+                'Authorization': `Bearer ${this.getToken()}`
+            }
+        });
         if (!response.ok) throw new Error('API bağlantı hatası!');
 
         const jsonResponse = await response.json();
@@ -40,7 +57,10 @@ export class ApiTransactionRepo implements ITransactionRepository {
         const numericId = parseInt(id.replace(/\D/g, ''), 10);
         const response = await fetch(`${this.fraudManagementUrl}/resolve-log`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.getToken()}`
+            },
             body: JSON.stringify({
                 logId: numericId,
                 adminAction: "MarkAsSafe",
@@ -61,7 +81,10 @@ export class ApiTransactionRepo implements ITransactionRepository {
         const numericId = parseInt(id.replace(/\D/g, ''), 10);
         const response = await fetch(`${this.fraudManagementUrl}/resolve-log`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.getToken()}`
+            },
             body: JSON.stringify({
                 logId: numericId,
                 adminAction: "MarkAsFraud",
@@ -86,7 +109,11 @@ export class ApiTransactionRepo implements ITransactionRepository {
     }
 
     async getLogDetailById(logId: number): Promise<any> {
-        const response = await fetch(`${this.fraudManagementUrl}/log-detail/${logId}`);
+        const response = await fetch(`${this.fraudManagementUrl}/log-detail/${logId}`, {
+            headers: {
+                'Authorization': `Bearer ${this.getToken()}`
+            }
+        });
         if (!response.ok) throw new Error('Detaylar çekilirken hata oluştu!');
 
         const jsonResponse = await response.json();
@@ -95,7 +122,11 @@ export class ApiTransactionRepo implements ITransactionRepository {
     }
 
     async getHistoricalTransactions(): Promise<{ transaction: Transaction, action: 'APPROVED' | 'BLOCKED' }[]> {
-        const response = await fetch(`${this.fraudManagementUrl}/resolved-logs`);
+        const response = await fetch(`${this.fraudManagementUrl}/resolved-logs`, {
+            headers: {
+                'Authorization': `Bearer ${this.getToken()}`
+            }
+        });
         if (!response.ok) throw new Error('Geçmiş veriler çekilirken hata oluştu!');
 
         const jsonResponse = await response.json();

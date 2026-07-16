@@ -2,6 +2,8 @@ using FraudGuard.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Reflection;
+using FraudGuard.Domain.Common.Enums;
+
 
 namespace FraudGuard.Infrastructure.Persistence.Contexts
 {
@@ -15,7 +17,8 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
         
         public DbSet<ETransactionType> TransactionTypes { get; set; } 
         public DbSet<EPaymentType> PaymentTypes { get; set; } 
-        
+        public DbSet<EUser> Users { get; set; }
+
         public DbSet<EFraudRule> FraudRules { get; set; }
         public DbSet<EFraudLog> FraudLogs { get; set; }
         public DbSet<EBlockReason> BlockReasons { get; set; }
@@ -76,6 +79,21 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                 new ECreditCard { CardId = 1, CustomerId = 1, CardNumber = "1234567812345678", ExpiryDate = "12/28", CVV = "123", CardLimit = 150000, AvailableLimit = 120000, IsBlocked = false, BlockReasonId = null },
                 new ECreditCard { CardId = 2, CustomerId = 2, CardNumber = "9876543298765432", ExpiryDate = "09/27", CVV = "456", CardLimit = 250000, AvailableLimit = 250000, IsBlocked = false, BlockReasonId = null }
             );
+
+                        // 7. Users Seeding
+            // Şifreler: admin123, karar123, analist123
+            modelBuilder.Entity<EUser>().HasData(
+                new EUser { UserId = 1, Username = "admin", Mail = "admin@fraudguard.com",
+                    PasswordUnderSHA256 = "JAvlGPq9JyTdtvBO6x2llnRI1+gxwIyPqCKAn3THIKk=",
+                    Role = UserRoleEnum.Admin },
+                new EUser { UserId = 2, Username = "karar", Mail = "karar@fraudguard.com",
+                    PasswordUnderSHA256 = "ycF0b3KW1cO5eyilr8tdOr8fCd508lL1nE30Wjv8rqk=",
+                    Role = UserRoleEnum.DecisionMaker },
+                new EUser { UserId = 3, Username = "analist", Mail = "analist@fraudguard.com",
+                    PasswordUnderSHA256 = "SeHF2O8QydoPiBO+vMacsLVAAg4yC3Om6zrH6r4F8HY=",
+                    Role = UserRoleEnum.Analyst }
+            );
+
         }
 
     }

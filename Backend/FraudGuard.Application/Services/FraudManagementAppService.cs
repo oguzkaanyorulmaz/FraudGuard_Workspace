@@ -8,6 +8,9 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore; 
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FraudGuard.Domain.Common.Enums;
+using FraudGuard.Application.Helpers;
+
 
 namespace FraudGuard.Application.Services
 {
@@ -81,7 +84,7 @@ namespace FraudGuard.Application.Services
             return ResponseDTO<bool>.Fail("Log çözümlenirken bir hata oluştu veya log bulunamadı.");
         }
 
-        public async Task<ResponseDTO<GetFraudLogDetailResponse>> GetLogDetailAsync(int logId)
+        public async Task<ResponseDTO<GetFraudLogDetailResponse>> GetLogDetailAsync(int logId, UserRoleEnum callerRole)
         {
             var logEntity = await _fraudLogRepository.GetLogWithDetailsAsync(logId);
             if (logEntity == null)
@@ -133,6 +136,15 @@ namespace FraudGuard.Application.Services
                     DeclineReason = t.DeclineReason
                 }).ToList()
             };
+
+            // Rol bazlı veri maskeleme
+            if (callerRole != UserRoleEnum.Admin)
+            {
+                detail.MaskedCardNumber = detail.MaskedCardNumber.MaskCardNumber();
+                detail.IdentityNumber = detail.IdentityNumber.MaskIdentityNumber();
+                detail.PhoneNumber = detail.PhoneNumber.MaskPhoneNumber();
+            }
+
             return ResponseDTO<GetFraudLogDetailResponse>.Success(detail);
         }
 

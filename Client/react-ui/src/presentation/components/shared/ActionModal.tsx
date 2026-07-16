@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Props {
     isOpen: boolean;
@@ -9,26 +10,21 @@ interface Props {
 }
 
 export const ActionModal: React.FC<Props> = ({ isOpen, actionType, transactionId, onConfirm, onCancel }) => {
+    const { user } = useAuth();
     const [reason, setReason] = useState('');
     const [error, setError] = useState('');
     const [selectedReasonId, setSelectedReasonId] = useState<number>(2);
-
-    const [analystName, setAnalystName] = useState('Oğuz Kaan');
 
     if (!isOpen || !transactionId) return null;
     const isBlock = actionType === 'BLOCK';
 
     const handleConfirm = () => {
-        if (!analystName.trim()) {
-            setError('Lütfen analist adını giriniz.');
-            return;
-        }
         if (reason.trim().length < 10) {
             setError('Lütfen en az 10 karakterlik bir gerekçe girin.');
             return;
         }
 
-        onConfirm(transactionId, reason, isBlock ? selectedReasonId : undefined, analystName);
+        onConfirm(transactionId, reason, isBlock ? selectedReasonId : undefined, user?.username || 'Bilinmiyor');
 
         setReason('');
         setError('');
@@ -58,14 +54,13 @@ export const ActionModal: React.FC<Props> = ({ isOpen, actionType, transactionId
                 <div className="p-5 space-y-4">
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Analist Adı Soyadı (Zorunlu)
+                            Aksiyonu Gerçekleştiren Kullanıcı
                         </label>
                         <input
                             type="text"
-                            className="w-full bg-white border border-[#C5CBD3] rounded-lg p-2.5 text-sm text-[#1A1D20] focus:outline-none focus:border-[#FFC72C]"
-                            value={analystName}
-                            onChange={(e) => setAnalystName(e.target.value)}
-                            placeholder="Adınızı ve soyadınızı girin..."
+                            className="w-full bg-slate-100 border border-[#C5CBD3] rounded-lg p-2.5 text-sm text-slate-600 focus:outline-none cursor-not-allowed font-semibold"
+                            value={user?.username || 'Bilinmiyor'}
+                            disabled
                         />
                     </div>
 

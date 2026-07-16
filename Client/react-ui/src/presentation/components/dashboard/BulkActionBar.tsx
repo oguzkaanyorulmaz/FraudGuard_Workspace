@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Props {
     selectedCount: number;
@@ -8,6 +9,9 @@ interface Props {
 }
 
 export const BulkActionBar: React.FC<Props> = ({ selectedCount, onBulkBlock, onClear, onBulkApprove }) => {
+    const { user } = useAuth();
+    const isAnalyst = user?.role === 3;
+
     if (selectedCount === 0) return null;
 
     return (
@@ -29,16 +33,26 @@ export const BulkActionBar: React.FC<Props> = ({ selectedCount, onBulkBlock, onC
                 </button>
 
                 <button
-                    onClick={onBulkApprove}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-2 border border-emerald-400/20 cursor-pointer"
+                    onClick={() => !isAnalyst && onBulkApprove()}
+                    disabled={isAnalyst}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-2 border ${
+                        isAnalyst 
+                            ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed' 
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/20 cursor-pointer'
+                    }`}
                 >
                     ✅ Seçilenlere İzin Ver
                 </button>
 
 
                 <button
-                    onClick={onBulkBlock}
-                    className="bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-2 border border-red-400/20 cursor-pointer"
+                    onClick={() => !isAnalyst && onBulkBlock()}
+                    disabled={isAnalyst}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-2 border ${
+                        isAnalyst 
+                            ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed' 
+                            : 'bg-red-600 hover:bg-red-500 text-white border-red-400/20 cursor-pointer'
+                    }`}
                 >
                     🚫 Seçilenleri Bloke Et
                 </button>

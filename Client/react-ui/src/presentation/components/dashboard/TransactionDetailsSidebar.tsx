@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Transaction } from '../../../domain/entities/Transaction';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Props {
     transaction: Transaction | null;
@@ -11,12 +12,19 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
     // C# API'den gelecek detay verilerini tutacağımız state
     const [detail, setDetail] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(false);
+    const { user } = useAuth();
+    // const isAnalyst = user?.role === 3;
 
     useEffect(() => {
         if (isOpen && transaction) {
             setLoading(true);
+            const token = user?.token || '';
             // Panel açıldığında gerçek log ID'si ile C#'a gidiyoruz
-            fetch(`http://localhost:5217/api/FraudManagement/log-detail/${transaction.id}`)
+            fetch(`http://localhost:5217/api/FraudManagement/log-detail/${transaction.id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
                 .then(res => res.json())
                 .then(json => {
                     if (json.isSuccess) {

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Transaction } from '../../../domain/entities/Transaction';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Props {
     transaction: Transaction;
@@ -15,6 +16,8 @@ interface Props {
 export const TransactionRow: React.FC<Props> = ({
     transaction, isSelected, isHistoryView, historyAction, onToggle, onApprove, onBlock, onViewDetails
 }) => {
+    const { user } = useAuth();
+    const isAnalyst = user?.role === 3;
     const scoreValue = transaction.riskScore ?? 0;
     const isHighRisk = scoreValue >= 70;
 
@@ -22,7 +25,13 @@ export const TransactionRow: React.FC<Props> = ({
         <tr className={`hover:bg-[#F8F9FA] transition-all duration-150 border-b border-[#E4E7EB] ${isSelected ? 'bg-[#FFC72C]/5' : ''}`}>
             <td className="p-4 text-center">
                 {!isHistoryView && (
-                    <input type="checkbox" checked={isSelected} onChange={() => onToggle(transaction.id)} className="w-4 h-4 rounded accent-blue-600 cursor-pointer" />
+                    <input 
+                        type="checkbox" 
+                        checked={isSelected} 
+                        onChange={() => !isAnalyst && onToggle(transaction.id)} 
+                        disabled={isAnalyst}
+                        className={`w-4 h-4 rounded accent-blue-600 ${isAnalyst ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} 
+                    />
                 )}
             </td>
             <td className="p-4">
@@ -54,8 +63,28 @@ export const TransactionRow: React.FC<Props> = ({
                     </div>
                 ) : (
                     <div className="flex gap-1.5">
-                        <button onClick={() => onApprove(transaction.id)} className="flex-1 bg-[#FFC72C] hover:bg-[#E5B224] text-[#111] px-2.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer">✔️ İzin</button>
-                        <button onClick={() => onBlock(transaction.id)} className="flex-1 bg-[#111111] hover:bg-black text-white px-2.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer">🚫 Bloke</button>
+                        <button 
+                            onClick={() => !isAnalyst && onApprove(transaction.id)} 
+                            disabled={isAnalyst}
+                            className={`flex-1 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
+                                isAnalyst 
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' 
+                                    : 'bg-[#FFC72C] hover:bg-[#E5B224] text-[#111] cursor-pointer'
+                            }`}
+                        >
+                            ✔️ İzin
+                        </button>
+                        <button 
+                            onClick={() => !isAnalyst && onBlock(transaction.id)} 
+                            disabled={isAnalyst}
+                            className={`flex-1 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
+                                isAnalyst 
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' 
+                                    : 'bg-[#111111] hover:bg-black text-white cursor-pointer'
+                            }`}
+                        >
+                            🚫 Bloke
+                        </button>
                     </div>
                 )}
                 <button onClick={() => onViewDetails(transaction)} className="w-full bg-white border border-[#C5CBD3] text-[#718096] hover:text-[#111] px-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer">

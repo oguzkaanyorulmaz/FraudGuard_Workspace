@@ -14,6 +14,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using System;
 using FraudGuard.API.Hubs;
+using FraudGuard.Domain.Interfaces.Abstractions;
+using FraudGuard.Infrastructure.Services;
+using FraudGuard.Infrastructure.Persistence.Repositories;
+using FraudGuard.Application.Services;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,6 +43,11 @@ builder.Services.AddScoped<IAdminOperationService, AdminOperationService>();
 builder.Services.AddScoped<ITransactionAppService, TransactionAppService>();
 builder.Services.AddScoped<IFraudManagementAppService, FraudManagementAppService>();
 builder.Services.AddScoped<IRuleManagementAppService, RuleManagementAppService>();
+// Auth & Security Services
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddSingleton<ICryptService, CryptService>();
+builder.Services.AddSingleton<IJwtService, JwtService>();
+builder.Services.AddScoped<IAuthAppService, AuthAppService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -76,6 +86,7 @@ using (var scope = app.Services.CreateScope())
 // Yönlendirme ve Cors sırası SignalR için çok önemlidir
 app.UseRouting();
 app.UseCors("AllowReactApp");
+app.UseMiddleware<JwtAuthMiddleware>();
 
 app.MapHub<FraudHub>("/fraudHub");
 

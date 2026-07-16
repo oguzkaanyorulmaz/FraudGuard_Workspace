@@ -8,6 +8,9 @@ import { TransactionDetailsSidebar } from './components/dashboard/TransactionDet
 import { useTransactions } from './hooks/useTransactions';
 import { useSelection } from './hooks/useSelection';
 import { theme } from './styles/theme';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LoginPage } from './components/auth/LoginPage';
+
 
 /* bg-[#F4F5F7] text-[#1A1D20] selection:bg-[#FFCB05] bg-white border-[#E4E7EB] shadow-sm 
   text-xs text-[#718096] text-4xl text-[#111111] bg-[#E4E7EB] bg-[#111111] 
@@ -16,7 +19,7 @@ import { theme } from './styles/theme';
 
 
 
-export default function App() {
+function Dashboard() {
     const { transactions, history, loading, handleApprove, handleBlock, handleBulkBlock, handleBulkApprove } = useTransactions();
     const { selectedIds, toggleSelection, selectAll, clearSelection } = useSelection();
 
@@ -32,7 +35,7 @@ export default function App() {
     const handleSort = (field: string) => {
         setSortFields(prev => {
             const isCompositeField = field === 'amount' || field === 'currency';
-            
+
             if (!isCompositeField) {
                 const existing = prev.find(s => s.field === field);
                 if (existing) {
@@ -45,8 +48,8 @@ export default function App() {
             const existingIndex = newSorts.findIndex(s => s.field === field);
             if (existingIndex > -1) {
                 const current = newSorts[existingIndex];
-                const updated = { 
-                    field: current.field, 
+                const updated = {
+                    field: current.field,
                     direction: (current.direction === 'asc' ? 'desc' : 'asc') as 'asc' | 'desc'
                 };
                 const nextSorts = [...newSorts];
@@ -109,7 +112,7 @@ export default function App() {
 
     const matchScenario = (txn: Transaction, scenario: string): boolean => {
         if (scenario === 'ALL') return true;
-        
+
         const ruleName = (txn.ruleName || '').toLowerCase();
         const reason = (txn.suspicionReason || '').toLowerCase();
         const fraudReason = (txn.fraudReason || '').toLowerCase();
@@ -231,8 +234,8 @@ export default function App() {
                     <button
                         onClick={() => handleTopCardClick('PENDING')}
                         className={`${theme.styles.card} cursor-pointer text-left w-full hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 focus:outline-none ${isPendingActive
-                                ? 'bg-slate-100/80 font-semibold'
-                                : 'opacity-70 hover:opacity-100'
+                            ? 'bg-slate-100/80 font-semibold'
+                            : 'opacity-70 hover:opacity-100'
                             }`}
                     >
                         <div className="absolute top-0 left-0 w-full h-1 bg-[#111111]"></div>
@@ -246,8 +249,8 @@ export default function App() {
                     <button
                         onClick={() => handleTopCardClick('BLOCKED')}
                         className={`${theme.styles.card} cursor-pointer text-left w-full hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 focus:outline-none ${isBlockedActive
-                                ? 'bg-red-50/50 font-semibold'
-                                : 'opacity-70 hover:opacity-100'
+                            ? 'bg-red-50/50 font-semibold'
+                            : 'opacity-70 hover:opacity-100'
                             }`}
                     >
                         <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
@@ -258,8 +261,8 @@ export default function App() {
                     <button
                         onClick={() => handleTopCardClick('APPROVED')}
                         className={`${theme.styles.card} cursor-pointer text-left w-full hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 focus:outline-none ${isApprovedActive
-                                ? 'bg-emerald-50/50 font-semibold'
-                                : 'opacity-70 hover:opacity-100'
+                            ? 'bg-emerald-50/50 font-semibold'
+                            : 'opacity-70 hover:opacity-100'
                             }`}
                     >
                         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
@@ -351,5 +354,23 @@ export default function App() {
             {/* Yan Panel */}
             <TransactionDetailsSidebar transaction={sidebarTxn} isOpen={!!sidebarTxn} onClose={() => setSidebarTxn(null)} />
         </div>
+    );
+}
+
+function AppRouter() {
+    const { isLoggedIn } = useAuth();
+
+    if (!isLoggedIn) {
+        return <LoginPage />;
+    }
+
+    return <Dashboard />;
+}
+
+export default function App() {
+    return (
+        <AuthProvider>
+            <AppRouter />
+        </AuthProvider>
     );
 }
