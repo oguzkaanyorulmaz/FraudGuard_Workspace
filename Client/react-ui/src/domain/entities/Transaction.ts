@@ -11,6 +11,7 @@ export interface TransactionProps {
     location: string;
     date: string;
     fraudReason?: string;
+    ruleCode?: string;
 }
 
 export class Transaction {
@@ -31,6 +32,6 @@ export class Transaction {
     get location(): string { return this.props.location; }
     get date(): string { return this.props.date; }
 
-    // YENİ EKLENDİ: Sidebar'ın okuyabilmesi için Getter açtık
     get fraudReason(): string | undefined { return this.props.fraudReason; }
+    get ruleCode(): string | undefined { return this.props.ruleCode; }
 }

@@ -71,13 +71,23 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
             // 5. Customers Seeding
             modelBuilder.Entity<ECustomer>().HasData(
                 new ECustomer { CustomerId = 1, FirstName = "Ahmet", LastName = "Yılmaz", IdentityNumber = "12345678901", PhoneNumber = "+905555555555", Email = "ahmet@mail.com", CreatedAt = new DateTime(2026, 7, 16) },
-                new ECustomer { CustomerId = 2, FirstName = "Ayşe", LastName = "Kaya", IdentityNumber = "98765432109", PhoneNumber = "+905444444444", Email = "ayse@mail.com", CreatedAt = new DateTime(2026, 7, 16) }
+                new ECustomer { CustomerId = 2, FirstName = "Ayşe", LastName = "Kaya", IdentityNumber = "98765432109", PhoneNumber = "+905444444444", Email = "ayse@mail.com", CreatedAt = new DateTime(2026, 7, 16) },
+                new ECustomer { CustomerId = 3, FirstName = "Mehmet", LastName = "Demir", IdentityNumber = "55555555555", PhoneNumber = "+905333333333", Email = "mehmet@mail.com", CreatedAt = new DateTime(2026, 7, 16) },
+                new ECustomer { CustomerId = 4, FirstName = "Fatma", LastName = "Çelik", IdentityNumber = "44444444444", PhoneNumber = "+905222222222", Email = "fatma@mail.com", CreatedAt = new DateTime(2026, 7, 16) },
+                new ECustomer { CustomerId = 5, FirstName = "Mustafa", LastName = "Şahin", IdentityNumber = "33333333333", PhoneNumber = "+905111111111", Email = "mustafa@mail.com", CreatedAt = new DateTime(2026, 7, 16) },
+                new ECustomer { CustomerId = 6, FirstName = "Zeynep", LastName = "Öztürk", IdentityNumber = "22222222222", PhoneNumber = "+905000000000", Email = "zeynep@mail.com", CreatedAt = new DateTime(2026, 7, 16) },
+                new ECustomer { CustomerId = 7, FirstName = "Ali", LastName = "Yıldız", IdentityNumber = "99988877766", PhoneNumber = "+905999999999", Email = "ali@mail.com", CreatedAt = new DateTime(2026, 7, 16) }
             );
 
             // 6. Credit Cards Seeding
             modelBuilder.Entity<ECreditCard>().HasData(
                 new ECreditCard { CardId = 1, CustomerId = 1, CardNumber = "1234567812345678", ExpiryDate = "12/28", CVV = "123", CardLimit = 150000, AvailableLimit = 120000, IsBlocked = false, BlockReasonId = null },
-                new ECreditCard { CardId = 2, CustomerId = 2, CardNumber = "9876543298765432", ExpiryDate = "09/27", CVV = "456", CardLimit = 250000, AvailableLimit = 250000, IsBlocked = false, BlockReasonId = null }
+                new ECreditCard { CardId = 2, CustomerId = 2, CardNumber = "9876543298765432", ExpiryDate = "09/27", CVV = "456", CardLimit = 250000, AvailableLimit = 250000, IsBlocked = false, BlockReasonId = null },
+                new ECreditCard { CardId = 3, CustomerId = 3, CardNumber = "1111222233334444", ExpiryDate = "05/29", CVV = "111", CardLimit = 10000, AvailableLimit = 10000, IsBlocked = false, BlockReasonId = null },
+                new ECreditCard { CardId = 4, CustomerId = 4, CardNumber = "5555666677778888", ExpiryDate = "06/30", CVV = "555", CardLimit = 500000, AvailableLimit = 500000, IsBlocked = false, BlockReasonId = null },
+                new ECreditCard { CardId = 5, CustomerId = 5, CardNumber = "1234123412341234", ExpiryDate = "10/28", CVV = "321", CardLimit = 100000, AvailableLimit = 100000, IsBlocked = false, BlockReasonId = null },
+                new ECreditCard { CardId = 6, CustomerId = 6, CardNumber = "4321432143214321", ExpiryDate = "11/27", CVV = "654", CardLimit = 20000, AvailableLimit = 20000, IsBlocked = false, BlockReasonId = null },
+                new ECreditCard { CardId = 7, CustomerId = 7, CardNumber = "9999888877776666", ExpiryDate = "01/30", CVV = "999", CardLimit = 1000000, AvailableLimit = 1000000, IsBlocked = false, BlockReasonId = null }
             );
 
                         // 7. Users Seeding

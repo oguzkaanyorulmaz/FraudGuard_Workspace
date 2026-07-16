@@ -112,35 +112,7 @@ function Dashboard() {
 
     const matchScenario = (txn: Transaction, scenario: string): boolean => {
         if (scenario === 'ALL') return true;
-
-        const ruleName = (txn.ruleName || '').toLowerCase();
-        const reason = (txn.suspicionReason || '').toLowerCase();
-        const fraudReason = (txn.fraudReason || '').toLowerCase();
-
-        switch (scenario) {
-            case 'BRUTE_FORCE':
-                return ruleName.includes('ardışık') || ruleName.includes('brute') || reason.includes('ardışık') || reason.includes('brute') || fraudReason.includes('ardışık') || fraudReason.includes('brute');
-            case 'IMPOSSIBLE_TRAVEL':
-                return ruleName.includes('seyahat') || ruleName.includes('travel') || reason.includes('seyahat') || reason.includes('travel') || fraudReason.includes('seyahat') || fraudReason.includes('travel');
-            case 'CARD_TESTING':
-                return ruleName.includes('deneme') || ruleName.includes('yoklama') || ruleName.includes('testing') || reason.includes('deneme') || reason.includes('yoklama') || reason.includes('testing') || fraudReason.includes('deneme') || fraudReason.includes('yoklama') || fraudReason.includes('testing');
-            case 'MAX_OUT':
-                return ruleName.includes('boşaltma') || ruleName.includes('max') || reason.includes('boşaltma') || reason.includes('max') || fraudReason.includes('boşaltma') || fraudReason.includes('max');
-            case 'ANOMALOUS_TIME':
-                return ruleName.includes('zaman') || ruleName.includes('saat') || ruleName.includes('time') || reason.includes('zaman') || reason.includes('saat') || reason.includes('time') || fraudReason.includes('zaman') || fraudReason.includes('saat') || fraudReason.includes('time');
-            case 'CROSS_BORDER':
-                return ruleName.includes('sınır') || ruleName.includes('cross') || reason.includes('sınır') || reason.includes('cross') || fraudReason.includes('sınır') || fraudReason.includes('cross');
-            case 'CURRENCY_MISMATCH':
-                return ruleName.includes('para birimi') || ruleName.includes('currency') || reason.includes('para birimi') || reason.includes('currency') || fraudReason.includes('para birimi') || fraudReason.includes('currency');
-            case 'HIGH_RISK_MCC':
-                return ruleName.includes('işyeri') || ruleName.includes('mcc') || reason.includes('işyeri') || reason.includes('mcc') || fraudReason.includes('işyeri') || fraudReason.includes('mcc');
-            case 'VELOCITY':
-                return ruleName.includes('hız') || ruleName.includes('velocity') || reason.includes('hız') || reason.includes('velocity') || fraudReason.includes('hız') || fraudReason.includes('velocity');
-            case 'CONSECUTIVE_REFUNDS':
-                return ruleName.includes('iade') || ruleName.includes('refund') || reason.includes('iade') || reason.includes('refund') || fraudReason.includes('iade') || fraudReason.includes('refund');
-            default:
-                return false;
-        }
+        return txn.ruleCode === scenario;
     };
 
     // Filtreleme ve Sıralama Mantığı

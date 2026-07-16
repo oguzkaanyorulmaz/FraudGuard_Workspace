@@ -12,6 +12,7 @@ namespace FraudGuard.Application.Mappings
         {
             CreateMap<EFraudLog, GetUnresolvedLogsResponse>()
                 .ForMember(dest => dest.RuleName, opt => opt.MapFrom(src => src.FraudRule.RuleName))
+                .ForMember(dest => dest.RuleCode, opt => opt.MapFrom(src => src.FraudRule.RuleCode))
                 .ForMember(dest => dest.Amount, opt => opt.MapFrom(src => src.Transaction.Amount))
                 .ForMember(dest => dest.Currency, opt => opt.MapFrom(src => src.Transaction.Currency))
                 .ForMember(dest => dest.MaskedCardNumber, opt => opt.MapFrom(src => src.Transaction.CreditCard.CardNumber.MaskCardNumber()))

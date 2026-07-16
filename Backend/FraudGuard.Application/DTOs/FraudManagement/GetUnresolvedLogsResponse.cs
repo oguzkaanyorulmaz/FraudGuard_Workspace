@@ -7,6 +7,7 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public int LogId { get; set; }
         public int TransactionId { get; set; }
         public string? RuleName { get; set; }
+        public string? RuleCode { get; set; }
         public string? SuspicionReason { get; set; }
         public int RiskScore { get; set; }        
         public decimal Amount { get; set; }

@@ -42,10 +42,10 @@ namespace FraudGuard.Domain.Services
                     .OrderByDescending(t => t.TransactionDate)
                     .ToList();
 
-                int consecutiveRefunds = 1; // Şu anki iade işlemiyle başla
+                int consecutiveRefunds = 1;
                 foreach (var tx in recentRefundsOrdered)
                 {
-                    if (tx.TransactionTypeId == 2) // 2: Refund
+                    if (tx.TransactionTypeId == 2)
                     {
                         consecutiveRefunds++;
                     }
@@ -61,30 +61,20 @@ namespace FraudGuard.Domain.Services
                 }
             }
 
-            // ==========================================
-            // GÜVENLİK DUVARI: İade/İptal İşlemlerini Reddet
-            // ==========================================
             if ((int)input.TransactionType == 2 || (int)input.TransactionType == 3)
             {
-                return (null, null); // İade/İptal işlemleri risk taşımaz
+                return (null, null);
             }
 
-            // ==========================================
-            // SENARYO 1: Lokasyon Kuralı (Impossible Travel)
-            // ==========================================
             var lastApprovedTx = recentTransactions.OrderByDescending(t => t.TransactionDate).FirstOrDefault(t => t.Status == "Approved");
             if (lastApprovedTx != null && lastApprovedTx.Location != input.Location)
             {
                 if ((DateTime.Now - lastApprovedTx.TransactionDate).TotalMinutes <= 10)
                     return ("IMPOSSIBLE_TRAVEL", $"10 dakika içinde önce {lastApprovedTx.Location}, ardından {input.Location} lokasyonlarından işlem denemesi.");
             }
-            // ==========================================
-            // SENARYO 2: Ardışık Hata (Brute Force)
-            // ==========================================
             bool isCurrentDeclined = false;
             if (card != null)
             {
-                // Kart bilgisi veya bakiye hatası alacak mı kontrol et
                 if (card.CVV != input.CVV)
                     isCurrentDeclined = true;
                 decimal processedAmount = input.Amount;
@@ -93,7 +83,6 @@ namespace FraudGuard.Domain.Services
                 if (card.AvailableLimit < processedAmount)
                     isCurrentDeclined = true;
             }
-            // Son 30 dakikadaki tüm işlemleri en yeniden en eskiye sırala
             var recentOrdered = recentTransactions
                 .Where(t => (DateTime.Now - t.TransactionDate).TotalMinutes <= 30)
                 .OrderByDescending(t => t.TransactionDate)
@@ -110,47 +99,29 @@ namespace FraudGuard.Domain.Services
                 }
                 else if (tx.Status == "Approved")
                 {
-                    // Araya onaylanmış bir işlem girdiyse ardışıklık bozulur
                     break;
                 }
             }
-            // Eğer şu anki işlem de hata alacaksa ve geçmişte 2 ardışık hata varsa (toplamda 3), Brute Force tetiklenir.
-            // Eğer şu anki işlem hatasızsa ama geçmişte zaten 3 ardışık hata birikmişse, işlem engellenir ve Brute Force tetiklenir.
             if ((isCurrentDeclined && consecutiveDeclines >= 2) || (!isCurrentDeclined && consecutiveDeclines >= 3))
             {
                 int totalDeclines = isCurrentDeclined ? consecutiveDeclines + 1 : consecutiveDeclines;
                 return ("BRUTE_FORCE", $"Son 30 dakika içerisinde ardışık {totalDeclines} veya daha fazla reddedilmiş işlem denemesi yapıldı.");
             }
-            // ==========================================
-            // SENARYO 3: Yoklama Çekimi (Card Testing)
-            // ==========================================
             var smallTestTx = recentTransactions.FirstOrDefault(t => t.Amount <= 10 && (DateTime.Now - t.TransactionDate).TotalMinutes <= 30);
             if (smallTestTx != null && input.Amount >= 20000)
                 return ("CARD_TESTING", "Küçük tutarlı (yoklama) bir işlemin hemen ardından yüklü miktarda çekim denemesi yapıldı.");
-            // ==========================================
-            // SENARYO 4: Limit Boşaltma Denemesi (Max-Out Attempt)
-            // ==========================================
             if (card != null && card.CardLimit > 0)
             {
                 decimal limitUsagePercentage = (input.Amount / card.CardLimit) * 100;
                 if (limitUsagePercentage >= 95)
                     return ("MAX_OUT", "Tek seferde kart limitinin %95'ini veya daha fazlasını boşaltma denemesi.");
             }
-            // ==========================================
-            // SENARYO 5: Zaman ve Tutar Kuralı (Anomalous Time)
-            // ==========================================
             int currentHour = DateTime.Now.Hour;
             if (currentHour >= 2 && currentHour <= 5 && input.Amount >= 100000)
                 return ("ANOMALOUS_TIME", "Gece 02:00 - 05:00 saatleri arasında olağandışı yüksek tutarlı (100.000+) işlem denemesi.");
-            // ==========================================
-            // SENARYO 6: Sınır Ötesi İşlem (Cross Border)
-            // ==========================================
             bool hasForeignTxBefore = recentTransactions.Any(t => t.Country != "Türkiye");
             if (!hasForeignTxBefore && input.Country != "Türkiye")
                 return ("CROSS_BORDER", "Müşterinin geçmişinde yurt dışı işlemi bulunmamasına rağmen Türkiye dışından işlem denemesi yapıldı.");
-            // ==========================================
-            // SENARYO 7: Para Birimi Anormalliği (Currency Mismatch)
-            // ==========================================
             if (input.Currency != "TRY")
             {
                 bool hasUsedCurrencyBefore = recentTransactions.Any(t => t.Currency == input.Currency && t.Status == "Approved");
@@ -159,23 +130,18 @@ namespace FraudGuard.Domain.Services
                     return ("CURRENCY_MISMATCH", $"Müşteri geçmişinde daha önce hiç {input.Currency} para birimiyle işlem kaydı bulunmuyor."); 
                 }
             }
-            // ==========================================
-            // SENARYO 8: Yüksek Riskli İşyeri Tipi (High-Risk MCC)
-            // ==========================================
             string[] highRiskMcc = { "Kuyumcu", "Bahis", "Kripto Borsası" };
             if (highRiskMcc.Contains(input.MerchantCategory))
             {
                 if (input.Amount > 10000) 
                     return ("HIGH_RISK_MCC", "Yüksek riskli işyeri kategorisinden (Kuyumcu, Bahis vb.) yüksek tutarlı çekim denemesi.");
             }
-            // ==========================================
-            // SENARYO 9: Hız/Sıklık Kuralı (Velocity)
-            // ==========================================
             var countInLast5Mins = recentTransactions.Count(t => 
                 (DateTime.Now - t.TransactionDate).TotalMinutes <= 5 && 
-                t.Status == "Approved"); 
-            if (countInLast5Mins >= 2) 
-                return ("VELOCITY", "Son 5 dakika içerisinde 2'den fazla işlem denemesi tespit edildi.");
+                t.Status == "Approved" &&
+                t.TransactionTypeId == 1);
+            if (countInLast5Mins >= 3) 
+                return ("VELOCITY", "Son 5 dakika içerisinde 3'ten fazla satış işlemi denemesi tespit edildi.");
             return (null, null); 
         }
 

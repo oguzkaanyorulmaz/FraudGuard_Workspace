@@ -48,8 +48,8 @@ export class ApiTransactionRepo implements ITransactionRepository {
             ruleName: item.ruleName || "Bilinmeyen Kural",
             location: item.location || "Bilinmiyor",
             date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
-
-            fraudReason: item.fraudReason || undefined
+            fraudReason: item.fraudReason || undefined,
+            ruleCode: item.ruleCode || undefined
         }));
     }
 
@@ -148,7 +148,8 @@ export class ApiTransactionRepo implements ITransactionRepository {
                     ruleName: item.ruleName || "Bilinmeyen Kural",
                     location: item.location || "Bilinmiyor",
                     date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
-                    fraudReason: item.fraudReason || undefined
+                    fraudReason: item.fraudReason || undefined,
+                    ruleCode: item.ruleCode || undefined
                 }),
                 action: historyAction
             };
