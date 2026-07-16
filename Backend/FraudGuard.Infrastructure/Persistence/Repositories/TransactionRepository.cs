@@ -39,6 +39,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
         public async Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId)
         {
             return await _context.Transactions
+                .Include(t => t.TransactionType)
                 .Include(t => t.FraudLog)
                     .ThenInclude(fl => fl.FraudRule)
                 .Where(t => t.CardId == cardId && t.TransactionId != excludeTransactionId)
@@ -47,5 +48,23 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<int> GetUnrefundedSaleCountAsync(int cardId, decimal amount, string currency)
+        {
+            var approvedSalesCount = await _context.Transactions.CountAsync(t => 
+                t.CardId == cardId && 
+                t.TransactionTypeId == 1 && // 1: Sale
+                t.Amount == amount && 
+                t.Currency == currency && 
+                t.Status == "Approved");
+
+            var refundsCount = await _context.Transactions.CountAsync(t => 
+                t.CardId == cardId && 
+                t.TransactionTypeId == 2 && // 2: Refund
+                t.Amount == amount && 
+                t.Currency == currency && 
+                (t.Status == "Approved" || t.Status == "Suspicious"));
+
+            return approvedSalesCount - refundsCount;
+        }
     }
 }

@@ -133,6 +133,8 @@ export default function App() {
                 return ruleName.includes('işyeri') || ruleName.includes('mcc') || reason.includes('işyeri') || reason.includes('mcc') || fraudReason.includes('işyeri') || fraudReason.includes('mcc');
             case 'VELOCITY':
                 return ruleName.includes('hız') || ruleName.includes('velocity') || reason.includes('hız') || reason.includes('velocity') || fraudReason.includes('hız') || fraudReason.includes('velocity');
+            case 'CONSECUTIVE_REFUNDS':
+                return ruleName.includes('iade') || ruleName.includes('refund') || reason.includes('iade') || reason.includes('refund') || fraudReason.includes('iade') || fraudReason.includes('refund');
             default:
                 return false;
         }
@@ -309,6 +311,7 @@ export default function App() {
                                 <option value="CURRENCY_MISMATCH">Para Birimi Sapması (Currency)</option>
                                 <option value="HIGH_RISK_MCC">Yüksek Riskli MCC (İşyeri)</option>
                                 <option value="VELOCITY">Hız/Sıklık Kuralı (Velocity)</option>
+                                <option value="CONSECUTIVE_REFUNDS">Ardışık İade Kuralı (Consecutive Refunds)</option>
                             </select>
                             <input
                                 type="text"

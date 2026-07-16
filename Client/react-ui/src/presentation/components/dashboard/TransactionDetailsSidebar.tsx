@@ -57,6 +57,11 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                         <div className="text-3xl font-black text-[#111]">
                             {detail ? `${detail.amount} ${detail.currency}` : transaction.money.getFormatted()}
                         </div>
+                        {detail?.transactionTypeName && (
+                            <div className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-wider">
+                                ⚙️ {detail.transactionTypeName}
+                            </div>
+                        )}
                         <div className={`mt-3 inline-block px-3 py-1 rounded-full text-xs font-bold border ${isHighRisk ? 'bg-red-500/10 text-red-600 border-red-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
                             Risk Skoru: {scoreValue} / 100
                         </div>
@@ -128,7 +133,9 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                     detail.recentTransactions.map((tx: any, idx: number) => (
                                         <div key={idx} className="bg-[#F8F9FA] p-3.5 rounded-xl border border-[#E4E7EB] hover:border-[#FFC72C] transition-all flex flex-col gap-1.5">
                                             <div className="flex justify-between items-center">
-                                                <span className="text-xs font-black text-black">{tx.amount} {tx.currency}</span>
+                                                <span className="text-xs font-black text-black">
+                                                    {tx.amount} {tx.currency} <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">({tx.transactionTypeName})</span>
+                                                </span>
                                                 <span className="text-[10px] bg-white text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200 font-bold">{tx.merchantCategory}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-[11px] text-slate-500">

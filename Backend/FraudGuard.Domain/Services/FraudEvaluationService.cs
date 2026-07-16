@@ -2,6 +2,7 @@ using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Repositories;
+using FraudGuard.Domain.Common.Enums;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -29,6 +30,37 @@ namespace FraudGuard.Domain.Services
 
         public async Task<(string? RuleCode, string? FraudReason)> EvaluateAsync(ProcessTransactionInput input, int cardId)
         {
+            var recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(cardId, TimeSpan.FromHours(24));
+            var card = await _creditCardRepository.GetByIdAsync(cardId);
+
+            // ==========================================
+            // SENARYO 10: Ardışık İade Kuralı (Consecutive Refunds)
+            // ==========================================
+            if (input.TransactionType == TransactionTypeEnum.Refund)
+            {
+                var recentRefundsOrdered = recentTransactions
+                    .OrderByDescending(t => t.TransactionDate)
+                    .ToList();
+
+                int consecutiveRefunds = 1; // Şu anki iade işlemiyle başla
+                foreach (var tx in recentRefundsOrdered)
+                {
+                    if (tx.TransactionTypeId == 2) // 2: Refund
+                    {
+                        consecutiveRefunds++;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (consecutiveRefunds >= 3)
+                {
+                    return ("CONSECUTIVE_REFUNDS", $"Son 24 saat içinde ardışık {consecutiveRefunds} iade (Refund) işlemi denemesi yapıldı.");
+                }
+            }
+
             // ==========================================
             // GÜVENLİK DUVARI: İade/İptal İşlemlerini Reddet
             // ==========================================
@@ -36,8 +68,7 @@ namespace FraudGuard.Domain.Services
             {
                 return (null, null); // İade/İptal işlemleri risk taşımaz
             }
-            var recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(cardId, TimeSpan.FromHours(24));
-            var card = await _creditCardRepository.GetByIdAsync(cardId);
+
             // ==========================================
             // SENARYO 1: Lokasyon Kuralı (Impossible Travel)
             // ==========================================

@@ -74,13 +74,43 @@ namespace FraudGuard.Domain.Services
             // =================================================================
             // YENİ MİMARİ: Kategoriye Göre İşlem (1: Sale, 2: Refund, 3: Void)
             // =================================================================
-            if ((int)input.TransactionType == 2 || (int)input.TransactionType == 3)
+            if ((int)input.TransactionType == 2) // Refund (İade)
             {
-                // İade veya İptal işlemi: Limiti geri yükle, Fraud kontrolüne sokma
+                // Eşleşen ve henüz iade edilmemiş onaylı satış adedini kontrol et
+                int unrefundedSalesCount = await _transactionRepository.GetUnrefundedSaleCountAsync(card.CardId, input.Amount, input.Currency);
+                if (unrefundedSalesCount <= 0)
+                {
+                    result.Status = "Declined";
+                    result.DeclineReason = "Belirtilen İade sebebiyle eşleşen satış bulunmamaktadır.";
+                }
+                else
+                {
+                    // İade işlemi: Limiti geri yükle (ancak kartın maksimum limitini aşmayacak şekilde sınırla)
+                    card.AvailableLimit = Math.Min(card.AvailableLimit + processedAmount, card.CardLimit);
+
+                    // Ardışık iade fraud kuralını kontrol et
+                    var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, card.CardId);
+                    triggeredRuleCode = evaluationResult.RuleCode;
+                    capturedFraudReason = evaluationResult.FraudReason;
+                    
+                    isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
+                    if (isSuspicious)
+                    {
+                        result.Status = "Suspicious";
+                    }
+                    else
+                    {
+                        result.Status = "Approved";
+                    }
+                }
+            }
+            else if ((int)input.TransactionType == 3) // Void (İptal)
+            {
+                // İptal işlemi: Limiti geri yükle, Fraud kontrolüne sokma
                 result.Status = "Approved";
                 card.AvailableLimit += processedAmount;
             }
-                        else if ((int)input.TransactionType == 1)
+            else if ((int)input.TransactionType == 1) // Sale (Satış)
             {
                 bool isInitialDecline = result.Status == "Declined";
 
@@ -126,6 +156,7 @@ namespace FraudGuard.Domain.Services
             {
                 CardId = card.CardId,
                 TransactionTypeId = (int)input.TransactionType,
+                PaymentTypeId = (int)input.PaymentType,
                 Amount = input.Amount,
                 Currency = input.Currency,
                 TransactionDate = DateTime.Now,

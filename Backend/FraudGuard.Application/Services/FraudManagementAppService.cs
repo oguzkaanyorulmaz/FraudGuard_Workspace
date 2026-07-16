@@ -98,6 +98,7 @@ namespace FraudGuard.Application.Services
                 TransactionDate = logEntity.Transaction.TransactionDate,
                 Location = logEntity.Transaction.Location,
                 Country = logEntity.Transaction.Country,
+                TransactionTypeName = logEntity.Transaction.TransactionType?.Description ?? "Bilinmeyen",
                 
                 MaskedCardNumber = logEntity.Transaction.CreditCard.CardNumber, 
                 CardLimit = logEntity.Transaction.CreditCard.CardLimit,
@@ -120,6 +121,7 @@ namespace FraudGuard.Application.Services
                     Currency = t.Currency,
                     Location = t.Location,
                     Country = t.Country,
+                    TransactionTypeName = t.TransactionType?.Description ?? "Bilinmeyen",
                     TransactionDate = t.TransactionDate,
                     MerchantCategory = t.MerchantCategory,
                     Status = t.Status,

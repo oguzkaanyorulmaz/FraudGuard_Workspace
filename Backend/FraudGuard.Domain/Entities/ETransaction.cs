@@ -9,8 +9,9 @@ namespace FraudGuard.Domain.Entities
         public int CardId { get; set; }
         
         public int TransactionTypeId { get; set; } 
+        public int PaymentTypeId { get; set; }
         public string Currency { get; set; } = "TRY";
-
+        
         public decimal Amount { get; set; }
         public DateTime TransactionDate { get; set; }
         public string Location { get; set; }
@@ -23,6 +24,7 @@ namespace FraudGuard.Domain.Entities
 // Mevcut propertilerin arasına ekle
         public ECreditCard CreditCard { get; set; }
         public ETransactionType TransactionType { get; set; }
+        public EPaymentType PaymentType { get; set; }
         public EFraudLog FraudLog { get; set; }
     }
 }

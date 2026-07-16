@@ -52,6 +52,8 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .Include(f => f.Transaction)
                     .ThenInclude(t => t.CreditCard)
                         .ThenInclude(c => c.Customer)
+                .Include(f => f.Transaction)
+                    .ThenInclude(t => t.TransactionType)
                 .FirstOrDefaultAsync(f => f.LogId == logId);
         }
 

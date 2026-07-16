@@ -12,6 +12,7 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public DateTime TransactionDate { get; set; }
         public string Location { get; set; }
         public string Country { get; set; }
+        public string TransactionTypeName { get; set; }
         
         public string RuleName { get; set; } 
         public string SuspicionReason { get; set; }
@@ -35,6 +36,7 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public decimal Amount { get; set; }
         public string Currency { get; set; }
         public string Location { get; set; }
+        public string TransactionTypeName { get; set; }
         public string Country { get; set; }
         public DateTime TransactionDate { get; set; }
         public string MerchantCategory { get; set; }

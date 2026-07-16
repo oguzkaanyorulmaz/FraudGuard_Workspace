@@ -18,11 +18,16 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
                    .HasForeignKey(t => t.TransactionTypeId)
                    .OnDelete(DeleteBehavior.Restrict);
 
+            builder.HasOne(t => t.PaymentType)
+                   .WithMany(pt => pt.Transactions)
+                   .HasForeignKey(t => t.PaymentTypeId)
+                   .OnDelete(DeleteBehavior.Restrict);
+
             builder.Property(t => t.Location).HasMaxLength(100);
             builder.Property(t => t.Country).HasMaxLength(50).HasDefaultValue("Türkiye");
             builder.Property(t => t.MerchantCategory).HasMaxLength(50).HasDefaultValue("Diğer");
             builder.Property(t => t.Status).IsRequired().HasMaxLength(20);
-            builder.Property(t => t.DeclineReason).HasMaxLength(50);
+            builder.Property(t => t.DeclineReason).HasMaxLength(250);
 
             builder.HasOne(t => t.CreditCard)
                    .WithMany(c => c.Transactions)
