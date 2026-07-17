@@ -12,6 +12,8 @@ export interface TransactionProps {
     date: string;
     fraudReason?: string;
     ruleCode?: string;
+    paymentType?: string;
+
 }
 
 export class Transaction {
@@ -34,4 +36,6 @@ export class Transaction {
 
     get fraudReason(): string | undefined { return this.props.fraudReason; }
     get ruleCode(): string | undefined { return this.props.ruleCode; }
+    get paymentType(): string | undefined { return this.props.paymentType; }
+
 }

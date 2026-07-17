@@ -28,6 +28,74 @@ function Dashboard() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedScenario, setSelectedScenario] = useState<string>('ALL');
 
+    // Ödeme Tipi State'i
+    const [selectedPaymentType, setSelectedPaymentType] = useState<string>('ALL');
+
+    // Ödeme Tipine Göre Gruplanmış Senaryolar
+    const paymentTypeScenarios: Record<string, { value: string; label: string }[]> = {
+        ALL: [
+            { value: 'BRUTE_FORCE', label: 'Ardışık Red (Brute Force)' },
+            { value: 'IMPOSSIBLE_TRAVEL', label: 'İmkansız Seyahat (Impossible Travel)' },
+            { value: 'CARD_TESTING', label: 'Yoklama Çekimi (Card Testing)' },
+            { value: 'MAX_OUT', label: 'Limit Boşaltma (Max-Out)' },
+            { value: 'ANOMALOUS_TIME', label: 'Gece Sıradışı Tutar (Anomalous Time)' },
+            { value: 'CROSS_BORDER', label: 'Sınır Ötesi İşlem (Cross Border)' },
+            { value: 'CURRENCY_MISMATCH', label: 'Para Birimi Sapması (Currency)' },
+            { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
+            { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
+            { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
+            { value: 'ACCOUNT_DRAIN', label: 'Hesap Boşaltma (Account Drain)' },
+            { value: 'SMURFING', label: 'Dilimleme (Smurfing)' },
+            { value: 'WALLET_CASHOUT', label: 'Wallet Cash-Out' },
+            { value: 'MULTI_SOURCE_FUNDING', label: 'Çoklu Kaynakla Fonlama' },
+            { value: 'CROSS_BORDER_TRANSFER', label: 'Sınır Ötesi Transfer' },
+            { value: 'NEW_BENEFICIARY_TRANSFER', label: 'Yeni Alıcı Transferi' },
+            { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
+            { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
+            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderici' },
+            { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' }
+        ],
+        CREDIT_CARD: [
+            { value: 'BRUTE_FORCE', label: 'Ardışık Red (Brute Force)' },
+            { value: 'IMPOSSIBLE_TRAVEL', label: 'İmkansız Seyahat (Impossible Travel)' },
+            { value: 'CARD_TESTING', label: 'Yoklama Çekimi (Card Testing)' },
+            { value: 'MAX_OUT', label: 'Limit Boşaltma (Max-Out)' },
+            { value: 'ANOMALOUS_TIME', label: 'Gece Sıradışı Tutar (Anomalous Time)' },
+            { value: 'CROSS_BORDER', label: 'Sınır Ötesi İşlem (Cross Border)' },
+            { value: 'CURRENCY_MISMATCH', label: 'Para Birimi Sapması (Currency)' },
+            { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
+            { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
+            { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' }
+        ],
+        DEBIT_CARD: [
+            { value: 'ACCOUNT_DRAIN', label: 'Hesap Boşaltma (Account Drain)' },
+            { value: 'BRUTE_FORCE', label: 'Ardışık Red (Brute Force)' },
+            { value: 'IMPOSSIBLE_TRAVEL', label: 'İmkansız Seyahat (Impossible Travel)' },
+            { value: 'CARD_TESTING', label: 'Yoklama Çekimi (Card Testing)' },
+            { value: 'ANOMALOUS_TIME', label: 'Gece Sıradışı Tutar (Anomalous Time)' },
+            { value: 'CROSS_BORDER', label: 'Sınır Ötesi İşlem (Cross Border)' },
+            { value: 'CURRENCY_MISMATCH', label: 'Para Birimi Sapması (Currency)' },
+            { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
+            { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
+            { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' }
+        ],
+        BANK_TRANSFER: [
+            { value: 'SMURFING', label: 'Dilimleme (Smurfing)' },
+            { value: 'WALLET_CASHOUT', label: 'Wallet Cash-Out' },
+            { value: 'MULTI_SOURCE_FUNDING', label: 'Çoklu Kaynakla Fonlama' },
+            { value: 'CROSS_BORDER_TRANSFER', label: 'Sınır Ötesi Transfer' },
+            { value: 'NEW_BENEFICIARY_TRANSFER', label: 'Yeni Alıcı Transferi' },
+            { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
+            { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
+            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderici' },
+            { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' }
+        ],
+        DIGITAL_WALLET: [
+            { value: 'WALLET_CASHOUT', label: 'Wallet Cash-Out' }
+        ]
+    };
+
+
     const [sortFields, setSortFields] = useState<{ field: string; direction: 'asc' | 'desc' }[]>([
         { field: 'date', direction: 'desc' }
     ]);
@@ -141,10 +209,21 @@ function Dashboard() {
 
         const filtered = sourceData.filter(item => {
             const txn = item.transaction;
+
+            // Arama Terimi Filtresi
             if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
+
+            // Ödeme Tipi Filtresi
+            if (selectedPaymentType !== 'ALL') {
+                if (txn.paymentType !== selectedPaymentType) return false;
+            }
+
+            // Senaryo Filtresi
             if (!matchScenario(txn, selectedScenario)) return false;
+
             return true;
         });
+
 
         return [...filtered].sort((a, b) => {
             for (const sort of sortFields) {
@@ -270,32 +349,44 @@ function Dashboard() {
 
 
                         {/* Gelişmiş Filtreler */}
-                        <div className="flex gap-3 text-sm">
+                        <div className="flex flex-nowrap items-center gap-2 text-sm overflow-x-auto pb-1 md:pb-0">
+                            {/* Ödeme Tipi Seçimi */}
+                            <select
+                                value={selectedPaymentType}
+                                onChange={(e) => {
+                                    setSelectedPaymentType(e.target.value);
+                                    setSelectedScenario('ALL'); // Ödeme tipi değiştiğinde senaryo filtresini sıfırla
+                                }}
+                                className={`${theme.styles.select} w-40 md:w-48 text-xs md:text-sm`}
+                            >
+                                <option value="ALL">🔍 Tüm Tipler</option>
+                                <option value="CREDIT_CARD">💳 Kredi Kartı</option>
+                                <option value="DEBIT_CARD">🏦 Banka Kartı</option>
+                                <option value="BANK_TRANSFER">💸 EFT / Havale</option>
+                                <option value="DIGITAL_WALLET">📱 Dijital Cüzdan</option>
+                            </select>
+
+                            {/* Senaryo Seçimi (Dinamik Süzülen) */}
                             <select
                                 value={selectedScenario}
                                 onChange={(e) => setSelectedScenario(e.target.value)}
-                                className={theme.styles.select}
+                                className={`${theme.styles.select} w-44 md:w-52 text-xs md:text-sm`}
                             >
-                                <option value="ALL">Tüm Senaryolar</option>
-                                <option value="BRUTE_FORCE">Ardışık Red (Brute Force)</option>
-                                <option value="IMPOSSIBLE_TRAVEL">İmkansız Seyahat (Impossible Travel)</option>
-                                <option value="CARD_TESTING">Yoklama Çekimi (Card Testing)</option>
-                                <option value="MAX_OUT">Limit Boşaltma (Max-Out)</option>
-                                <option value="ANOMALOUS_TIME">Gece Sıradışı Tutar (Anomalous Time)</option>
-                                <option value="CROSS_BORDER">Sınır Ötesi İşlem (Cross Border)</option>
-                                <option value="CURRENCY_MISMATCH">Para Birimi Sapması (Currency)</option>
-                                <option value="HIGH_RISK_MCC">Yüksek Riskli MCC (İşyeri)</option>
-                                <option value="VELOCITY">Hız/Sıklık Kuralı (Velocity)</option>
-                                <option value="CONSECUTIVE_REFUNDS">Ardışık İade Kuralı (Consecutive Refunds)</option>
+                                <option value="ALL">📋 Tüm Senaryolar</option>
+                                {paymentTypeScenarios[selectedPaymentType]?.map(s => (
+                                    <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
                             </select>
+
                             <input
                                 type="text"
-                                placeholder="🔍 ID veya Kart Ara..."
+                                placeholder="🔍 Ara..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className={theme.styles.input}
+                                className={`${theme.styles.input.replace('w-64', '')} w-32 md:w-44 text-xs md:text-sm`}
                             />
                         </div>
+
                     </div>
 
                     <BulkActionBar selectedCount={selectedIds.length} onBulkBlock={openBulkBlockModal} onClear={clearSelection} onBulkApprove={openBulkApproveModal} />

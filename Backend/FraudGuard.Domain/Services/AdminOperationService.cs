@@ -11,15 +11,18 @@ namespace FraudGuard.Domain.Services
     {
         private readonly IFraudLogRepository _fraudLogRepository;
         private readonly ICreditCardRepository _creditCardRepository;
+        private readonly IDebitCardRepository _debitCardRepository;
         private readonly IUnitOfWork _unitOfWork;
 
         public AdminOperationService(
             IFraudLogRepository fraudLogRepository,
             ICreditCardRepository creditCardRepository,
+            IDebitCardRepository debitCardRepository,
             IUnitOfWork unitOfWork)
         {
             _fraudLogRepository = fraudLogRepository;
             _creditCardRepository = creditCardRepository;
+            _debitCardRepository = debitCardRepository;
             _unitOfWork = unitOfWork;
         }
 
@@ -75,12 +78,25 @@ public async Task<bool> ResolveFraudLogAsync(
     {
         if (log.Transaction != null)
         {
-            var card = await _creditCardRepository.GetByIdAsync(log.Transaction.CardId);
-            if (card != null)
+            if (log.Transaction.CreditCardId.HasValue)
             {
-                card.IsBlocked = true;
-                card.BlockReasonId = blockReasonId; 
-                await _creditCardRepository.UpdateAsync(card);
+                var card = await _creditCardRepository.GetByIdAsync(log.Transaction.CreditCardId.Value);
+                if (card != null)
+                {
+                    card.IsBlocked = true;
+                    card.BlockReasonId = blockReasonId; 
+                    await _creditCardRepository.UpdateAsync(card);
+                }
+            }
+            else if (log.Transaction.DebitCardId.HasValue)
+            {
+                var card = await _debitCardRepository.GetByIdAsync(log.Transaction.DebitCardId.Value);
+                if (card != null)
+                {
+                    card.IsBlocked = true;
+                    card.BlockReasonId = blockReasonId; 
+                    await _debitCardRepository.UpdateAsync(card);
+                }
             }
         }
     }

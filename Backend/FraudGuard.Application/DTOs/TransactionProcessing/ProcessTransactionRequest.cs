@@ -13,6 +13,7 @@ namespace FraudGuard.Application.DTOs.TransactionProcessing
         public string Currency { get; set; } = "TRY"; 
         public TransactionTypeEnum TransactionType { get; set; }
         public PaymentTypeEnum PaymentType { get; set; }
+        public int ChannelTypeId { get; set; } = 2;
         public string Location { get; set; }
         public string Country { get; set; } = "Türkiye";
         public string MerchantCategory { get; set; }

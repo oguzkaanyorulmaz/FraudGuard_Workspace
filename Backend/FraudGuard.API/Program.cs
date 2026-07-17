@@ -31,19 +31,17 @@ builder.Services.AddAutoMapper(cfg =>
 });
 
 builder.Services.AddScoped<ICreditCardRepository, CreditCardRepository>();
+builder.Services.AddScoped<IDebitCardRepository, DebitCardRepository>();
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<IFraudRuleRepository, FraudRuleRepository>();
 builder.Services.AddScoped<IFraudLogRepository, FraudLogRepository>();
 builder.Services.AddScoped<IUnitOfWork, FraudGuard.Infrastructure.Persistence.UnitOfWork>();
-
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IFraudEvaluationService, FraudEvaluationService>();
 builder.Services.AddScoped<IAdminOperationService, AdminOperationService>();
-
 builder.Services.AddScoped<ITransactionAppService, TransactionAppService>();
 builder.Services.AddScoped<IFraudManagementAppService, FraudManagementAppService>();
 builder.Services.AddScoped<IRuleManagementAppService, RuleManagementAppService>();
-// Auth & Security Services
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<ICryptService, CryptService>();
 builder.Services.AddSingleton<IJwtService, JwtService>();
@@ -54,15 +52,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(); 
 builder.Services.AddSignalR();
 
-// CORS Configuration for SignalR
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // Sadece React arayüzüne izin veriyoruz
+        policy.WithOrigins("http://localhost:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials(); // SignalR'ın çalışması için kimlik onayı zorunludur
+              .AllowCredentials();
     });
 });
 
@@ -71,26 +68,44 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    try
+    var context = services.GetRequiredService<FraudGuardDbContext>();
+    
+    int maxRetries = 12;
+    int delaySeconds = 5;
+    bool dbCreated = false;
+
+    for (int retry = 1; retry <= maxRetries; retry++)
     {
-        var context = services.GetRequiredService<FraudGuardDbContext>();
-// Migrate yerine EnsureCreated kullanıyoruz. Bu komut modellere bakıp tüm tabloları anında yaratır.
-        context.Database.EnsureCreated(); 
-        Console.WriteLine("Veritabanı ve tablolar kalıcı olarak oluşturuldu!");
+        try
+        {
+            Console.WriteLine($"Veritabanına bağlanılıyor ve tablolar oluşturuluyor (Deneme {retry}/{maxRetries})...");
+            context.Database.EnsureCreated();
+            Console.WriteLine("Veritabanı ve tablolar başarıyla oluşturuldu!");
+            dbCreated = true;
+            break;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Veritabanı oluşturulurken hata (Deneme {retry} başarısız): {ex.Message}");
+            if (retry < maxRetries)
+            {
+                Console.WriteLine($"{delaySeconds} saniye sonra tekrar denenecek...");
+                System.Threading.Thread.Sleep(delaySeconds * 1000);
+            }
+        }
     }
-    catch (Exception ex)
+
+    if (!dbCreated)
     {
-        Console.WriteLine("Veritabanı oluşturulurken hata: " + ex.Message);
+        Console.WriteLine($"HATA: Veritabanı {maxRetries} deneme sonrasında oluşturulamadı.");
     }
 }
-// Yönlendirme ve Cors sırası SignalR için çok önemlidir
 app.UseRouting();
 app.UseCors("AllowReactApp");
 app.UseMiddleware<JwtAuthMiddleware>();
 
 app.MapHub<FraudHub>("/fraudHub");
 
-// Kalkanlar (Middleware)
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())

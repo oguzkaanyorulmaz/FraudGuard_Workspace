@@ -9,6 +9,7 @@ namespace FraudGuard.Application.Mappings
         public TransactionMappingProfile()
         {
             CreateMap<ProcessTransactionRequest, ProcessTransactionInput>();
+            CreateMap<ProcessTransferRequest, ProcessTransactionInput>();
             
             CreateMap<TransactionCheckResult, ProcessTransactionResponse>();
         }

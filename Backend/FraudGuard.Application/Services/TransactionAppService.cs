@@ -5,6 +5,7 @@ using FraudGuard.Application.Interfaces;
 using FraudGuard.Application.Validations;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
+using FraudGuard.Domain.Common.Enums;
 using System.Threading.Tasks;
 
 namespace FraudGuard.Application.Services
@@ -39,6 +40,29 @@ namespace FraudGuard.Application.Services
                 "Declined" => "İşlem reddedildi.",
                 "Suspicious" => "İşlem şüpheli bulunarak incelemeye alındı.",
                 _ => "İşlem onaylandı."
+            };
+
+            return ResponseDTO<ProcessTransactionResponse>.Success(response, resultMessage);
+        }
+
+        public async Task<ResponseDTO<ProcessTransactionResponse>> ProcessTransferAsync(ProcessTransferRequest request)
+        {
+            if (request == null)
+                return ResponseDTO<ProcessTransactionResponse>.Fail("İstek boş olamaz.");
+
+            var input = _mapper.Map<ProcessTransactionInput>(request);
+            input.TransactionType = TransactionTypeEnum.Sale;
+            input.PaymentType = PaymentTypeEnum.EFT; 
+            input.ChannelTypeId = 4;
+
+            var result = await _transactionService.ProcessTransactionAsync(input);
+            var response = _mapper.Map<ProcessTransactionResponse>(result);
+
+            string resultMessage = response.Status switch
+            {
+                "Declined" => "Transfer reddedildi.",
+                "Suspicious" => "Transfer şüpheli bulunarak incelemeye alındı.",
+                _ => "Transfer başarıyla gerçekleştirildi."
             };
 
             return ResponseDTO<ProcessTransactionResponse>.Success(response, resultMessage);

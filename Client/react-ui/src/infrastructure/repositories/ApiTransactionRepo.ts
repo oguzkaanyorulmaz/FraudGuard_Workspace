@@ -49,7 +49,11 @@ export class ApiTransactionRepo implements ITransactionRepository {
             location: item.location || "Bilinmiyor",
             date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
             fraudReason: item.fraudReason || undefined,
-            ruleCode: item.ruleCode || undefined
+            ruleCode: item.ruleCode || undefined,
+            paymentType: item.paymentTypeCode === 'CreditCard' ? 'CREDIT_CARD' :
+                         item.paymentTypeCode === 'DebitCard' ? 'DEBIT_CARD' :
+                         (item.paymentTypeCode === 'BankTransfer' || item.paymentTypeCode === 'EFT') ? 'BANK_TRANSFER' :
+                         item.paymentTypeCode === 'DigitalWallet' ? 'DIGITAL_WALLET' : undefined
         }));
     }
 
@@ -149,7 +153,11 @@ export class ApiTransactionRepo implements ITransactionRepository {
                     location: item.location || "Bilinmiyor",
                     date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
                     fraudReason: item.fraudReason || undefined,
-                    ruleCode: item.ruleCode || undefined
+                    ruleCode: item.ruleCode || undefined,
+                    paymentType: item.paymentTypeCode === 'CreditCard' ? 'CREDIT_CARD' :
+                                 item.paymentTypeCode === 'DebitCard' ? 'DEBIT_CARD' :
+                                 (item.paymentTypeCode === 'BankTransfer' || item.paymentTypeCode === 'EFT') ? 'BANK_TRANSFER' :
+                                 item.paymentTypeCode === 'DigitalWallet' ? 'DIGITAL_WALLET' : undefined
                 }),
                 action: historyAction
             };

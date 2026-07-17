@@ -47,15 +47,19 @@ namespace FraudGuard.Application.Services
                 item.RuleName = originalLog.FraudRule?.RuleName ?? "Genel Şüpheli İşlem";
 
                 var tx = originalLog.Transaction;
-                var card = tx?.CreditCard;
+                var cc = tx?.CreditCard;
+                var dc = tx?.DebitCard;
 
-                if (tx != null && card != null && originalLog.FraudRule != null)
+                if (tx != null && originalLog.FraudRule != null)
                 {
+                    decimal limit = cc?.CardLimit ?? 0;
+                    decimal available = cc?.AvailableLimit ?? dc?.Balance ?? 0;
+
                     item.RiskScore = CalculateRiskScore(
                         originalLog.FraudRule.RuleCode,
                         tx.Amount,
-                        card.CardLimit,
-                        card.AvailableLimit
+                        limit,
+                        available
                     );
                 }
                 else
@@ -90,7 +94,12 @@ namespace FraudGuard.Application.Services
             {
                 return ResponseDTO<GetFraudLogDetailResponse>.Fail("Log detayları bulunamadı.");
             }
-            var recentTxList = await _transactionRepository.GetLast10TransactionsForCardAsync(logEntity.Transaction.CardId, logEntity.TransactionId);
+            var targetCardId = logEntity.Transaction.CreditCardId ?? logEntity.Transaction.DebitCardId ?? 0;
+            var recentTxList = await _transactionRepository.GetLast10TransactionsForCardAsync(targetCardId, logEntity.TransactionId);
+            var creditCard = logEntity.Transaction.CreditCard;
+            var debitCard = logEntity.Transaction.DebitCard;
+            var customer = creditCard?.Customer ?? debitCard?.Customer;
+
             var detail = new GetFraudLogDetailResponse
             {
                 LogId = logEntity.LogId, 
@@ -102,16 +111,16 @@ namespace FraudGuard.Application.Services
                 Country = logEntity.Transaction.Country,
                 TransactionTypeName = logEntity.Transaction.TransactionType?.Description ?? "Bilinmeyen",
                 
-                MaskedCardNumber = logEntity.Transaction.CreditCard.CardNumber, 
-                CardLimit = logEntity.Transaction.CreditCard.CardLimit,
-                AvailableLimit = logEntity.Transaction.CreditCard.AvailableLimit,
-                IsCardBlocked = logEntity.Transaction.CreditCard.IsBlocked,
+                MaskedCardNumber = creditCard?.CardNumber ?? debitCard?.CardNumber ?? logEntity.Transaction.SenderIBAN ?? "Bilinmiyor", 
+                CardLimit = creditCard?.CardLimit ?? 0,
+                AvailableLimit = creditCard?.AvailableLimit ?? debitCard?.Balance ?? 0,
+                IsCardBlocked = creditCard?.IsBlocked ?? debitCard?.IsBlocked ?? false,
                 AdminNote = logEntity.AdminNote,
                 ResolvedByAdmin = logEntity.ResolvedByAdmin,
                 
-                CustomerFullName = $"{logEntity.Transaction.CreditCard.Customer.FirstName} {logEntity.Transaction.CreditCard.Customer.LastName}",
-                IdentityNumber = logEntity.Transaction.CreditCard.Customer.IdentityNumber,
-                PhoneNumber = logEntity.Transaction.CreditCard.Customer.PhoneNumber, 
+                CustomerFullName = customer != null ? $"{customer.FirstName} {customer.LastName}" : "Bilinmeyen Müşteri",
+                IdentityNumber = customer?.IdentityNumber ?? "Bilinmiyor",
+                PhoneNumber = customer?.PhoneNumber ?? "Bilinmiyor", 
                 
                 RuleName = logEntity.FraudRule?.RuleName ?? "Genel Şüpheli İşlem",
                 SuspicionReason = logEntity.Transaction.FraudReason ?? "Sistem tarafından şüpheli bulundu.",
@@ -136,7 +145,6 @@ namespace FraudGuard.Application.Services
                 }).ToList()
             };
 
-            // Rol bazlı veri maskeleme
             if (callerRole != UserRoleEnum.Admin)
             {
                 detail.MaskedCardNumber = detail.MaskedCardNumber.MaskCardNumber();
@@ -163,15 +171,19 @@ namespace FraudGuard.Application.Services
                 item.RuleName = originalLog.FraudRule?.RuleName ?? "Genel Şüpheli İşlem";
 
                 var tx = originalLog.Transaction;
-                var card = tx?.CreditCard;
+                var cc = tx?.CreditCard;
+                var dc = tx?.DebitCard;
 
-                if (tx != null && card != null && originalLog.FraudRule != null)
+                if (tx != null && originalLog.FraudRule != null)
                 {
+                    decimal limit = cc?.CardLimit ?? 0;
+                    decimal available = cc?.AvailableLimit ?? dc?.Balance ?? 0;
+
                     item.RiskScore = CalculateRiskScore(
                         originalLog.FraudRule.RuleCode,
                         tx.Amount,
-                        card.CardLimit,
-                        card.AvailableLimit
+                        limit,
+                        available
                     );
                 }
                 else

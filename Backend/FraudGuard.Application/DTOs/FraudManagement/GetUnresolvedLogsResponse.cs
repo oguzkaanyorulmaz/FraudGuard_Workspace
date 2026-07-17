@@ -16,5 +16,7 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public DateTime LogDate { get; set; }
         public DateTime TransactionDate { get; set; }
         public string? AdminAction { get; set; }
+        public string? PaymentTypeCode { get; set; }
+
     }
 }

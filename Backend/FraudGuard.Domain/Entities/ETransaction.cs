@@ -6,10 +6,19 @@ namespace FraudGuard.Domain.Entities
     public class ETransaction
     {
         public int TransactionId { get; set; }
-        public int CardId { get; set; }
         
+
+        public int? CreditCardId { get; set; }
+        public int? DebitCardId { get; set; }
+        
+        public string? SenderIBAN { get; set; }
+        public string? ReceiverIBAN { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? Description { get; set; }
+
         public int TransactionTypeId { get; set; } 
         public int PaymentTypeId { get; set; }
+        public int ChannelTypeId { get; set; } 
         public string Currency { get; set; } = "TRY";
         
         public decimal Amount { get; set; }
@@ -21,10 +30,11 @@ namespace FraudGuard.Domain.Entities
         public string? DeclineReason { get; set; }
         public string? FraudReason { get; set; }
         
-// Mevcut propertilerin arasına ekle
-        public ECreditCard CreditCard { get; set; }
-        public ETransactionType TransactionType { get; set; }
-        public EPaymentType PaymentType { get; set; }
-        public EFraudLog FraudLog { get; set; }
+        public virtual ECreditCard? CreditCard { get; set; }
+        public virtual EDebitCard? DebitCard { get; set; }
+        public virtual ETransactionType TransactionType { get; set; }
+        public virtual EPaymentType PaymentType { get; set; }
+        public virtual EChannelType ChannelType { get; set; }
+        public virtual EFraudLog FraudLog { get; set; }
     }
 }

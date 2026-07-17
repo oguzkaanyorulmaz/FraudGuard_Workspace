@@ -29,12 +29,19 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
             var cutoffTime = DateTime.Now.Subtract(timeWindow);
             
             return await _context.Transactions
-                .Where(t => t.CardId == cardId && t.TransactionDate >= cutoffTime)
+                .Where(t => (t.CreditCardId == cardId || t.DebitCardId == cardId) && t.TransactionDate >= cutoffTime)
                 .ToListAsync();
         }
-        public async Task<bool> HasAnySuspiciousTransactionAsync(int cardId)
+        public async Task<bool> HasAnySuspiciousTransactionAsync(int cardId, bool isCreditCard)
         {
-            return await _context.Transactions.AnyAsync(t => t.CardId == cardId && t.Status == "Suspicious");
+            if (isCreditCard)
+            {
+                return await _context.Transactions.AnyAsync(t => t.CreditCardId == cardId && t.Status == "Suspicious");
+            }
+            else
+            {
+                return await _context.Transactions.AnyAsync(t => t.DebitCardId == cardId && t.Status == "Suspicious");
+            }
         }
         public async Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId)
         {
@@ -42,7 +49,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .Include(t => t.TransactionType)
                 .Include(t => t.FraudLog)
                     .ThenInclude(fl => fl.FraudRule)
-                .Where(t => t.CardId == cardId && t.TransactionId != excludeTransactionId)
+                .Where(t => (t.CreditCardId == cardId || t.DebitCardId == cardId) && t.TransactionId != excludeTransactionId)
                 .OrderByDescending(t => t.TransactionDate)
                 .Take(10)
                 .ToListAsync();
@@ -51,20 +58,28 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
         public async Task<int> GetUnrefundedSaleCountAsync(int cardId, decimal amount, string currency)
         {
             var approvedSalesCount = await _context.Transactions.CountAsync(t => 
-                t.CardId == cardId && 
+                (t.CreditCardId == cardId || t.DebitCardId == cardId) && 
                 t.TransactionTypeId == 1 && // 1: Sale
                 t.Amount == amount && 
                 t.Currency == currency && 
                 t.Status == "Approved");
 
             var refundsCount = await _context.Transactions.CountAsync(t => 
-                t.CardId == cardId && 
+                (t.CreditCardId == cardId || t.DebitCardId == cardId) && 
                 t.TransactionTypeId == 2 && // 2: Refund
                 t.Amount == amount && 
                 t.Currency == currency && 
                 (t.Status == "Approved" || t.Status == "Suspicious"));
 
             return approvedSalesCount - refundsCount;
+        }
+
+        public async Task<List<ETransaction>> GetRecentTransactionsByReceiverIBANAsync(string receiverIBAN, TimeSpan timeWindow)
+        {
+            var cutoffTime = DateTime.Now.Subtract(timeWindow);
+            return await _context.Transactions
+                .Where(t => t.ReceiverIBAN == receiverIBAN && t.TransactionDate >= cutoffTime)
+                .ToListAsync();
         }
     }
 }

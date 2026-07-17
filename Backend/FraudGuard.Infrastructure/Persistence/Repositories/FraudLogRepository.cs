@@ -23,6 +23,8 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .Include(f => f.FraudRule)
                 .Include(f => f.Transaction)
                     .ThenInclude(t => t.CreditCard)
+                .Include(f => f.Transaction)
+                    .ThenInclude(t => t.DebitCard)
                 .Where(f => string.IsNullOrEmpty(f.AdminAction))
                 .ToListAsync();
         }
@@ -49,9 +51,13 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
         {
 
             return await _context.FraudLogs
+                .Include(f => f.FraudRule)
                 .Include(f => f.Transaction)
                     .ThenInclude(t => t.CreditCard)
                         .ThenInclude(c => c.Customer)
+                .Include(f => f.Transaction)
+                    .ThenInclude(t => t.DebitCard)
+                        .ThenInclude(d => d.Customer)
                 .Include(f => f.Transaction)
                     .ThenInclude(t => t.TransactionType)
                 .FirstOrDefaultAsync(f => f.LogId == logId);
@@ -63,6 +69,8 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .Include(f => f.FraudRule)
                 .Include(f => f.Transaction)
                     .ThenInclude(t => t.CreditCard)
+                .Include(f => f.Transaction)
+                    .ThenInclude(t => t.DebitCard)
                 .Where(f => !string.IsNullOrEmpty(f.AdminAction)) 
                 .OrderByDescending(f => f.LogId)
                 .ToListAsync();

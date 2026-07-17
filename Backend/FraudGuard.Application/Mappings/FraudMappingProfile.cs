@@ -15,8 +15,19 @@ namespace FraudGuard.Application.Mappings
                 .ForMember(dest => dest.RuleCode, opt => opt.MapFrom(src => src.FraudRule.RuleCode))
                 .ForMember(dest => dest.Amount, opt => opt.MapFrom(src => src.Transaction.Amount))
                 .ForMember(dest => dest.Currency, opt => opt.MapFrom(src => src.Transaction.Currency))
-                .ForMember(dest => dest.MaskedCardNumber, opt => opt.MapFrom(src => src.Transaction.CreditCard.CardNumber.MaskCardNumber()))
-                .ForMember(dest => dest.TransactionDate, opt => opt.MapFrom(src => src.Transaction.TransactionDate));
+                .ForMember(dest => dest.MaskedCardNumber, opt => opt.MapFrom(src => 
+                    src.Transaction.CreditCard != null ? src.Transaction.CreditCard.CardNumber.MaskCardNumber() :
+                    (src.Transaction.DebitCard != null ? src.Transaction.DebitCard.CardNumber.MaskCardNumber() :
+                     (src.Transaction.SenderIBAN != null ? src.Transaction.SenderIBAN : "Bilinmiyor"))))
+                .ForMember(dest => dest.TransactionDate, opt => opt.MapFrom(src => src.Transaction.TransactionDate))
+                .ForMember(dest => dest.PaymentTypeCode, opt => opt.MapFrom(src => 
+                    src.Transaction == null ? "Unknown" :
+                    src.Transaction.PaymentTypeId == 1 ? "CreditCard" :
+                    src.Transaction.PaymentTypeId == 2 ? "DebitCard" :
+                    src.Transaction.PaymentTypeId == 3 ? "BankTransfer" :
+                    src.Transaction.PaymentTypeId == 4 ? "EFT" :
+                    src.Transaction.PaymentTypeId == 5 ? "DigitalWallet" : "Unknown"));
+
 
             CreateMap<EFraudRule, GetActiveRulesResponse>();
         }

@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations; // 1. Bu kütüphaneyi ekle
+using System.ComponentModel.DataAnnotations;
 
 namespace FraudGuard.Domain.Entities
 {
     public class ETransactionCategory
     {
-        [Key] // 2. İşte EF Core'a bunun bir primary key olduğunu söylüyoruz
+        [Key]
         public int CategoryId { get; set; }
         
         public string CategoryCode { get; set; }

@@ -116,8 +116,17 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                     <span className="text-xs font-semibold text-[#1A1D20]">{detail.phoneNumber || 'Kayıt Yok'}</span>
                                 </div>
                                 <div className="bg-white p-3.5 rounded-lg border border-[#E4E7EB] col-span-2">
-                                    <span className="text-[10px] text-[#718096] font-bold uppercase tracking-wider block mb-1">Kart Limiti, Kalan Limit & Durum</span>
-                                    <span className="text-xs font-semibold text-[#1A1D20]">Limit: {detail.cardLimit} TL | Kalan: {detail.availableLimit} TL | {detail.isCardBlocked ? 'Blokeli' : 'Aktif'}</span>
+                                    {detail.cardLimit > 0 ? (
+                                        <>
+                                            <span className="text-[10px] text-[#718096] font-bold uppercase tracking-wider block mb-1">Kart Limiti, Kalan Limit & Durum</span>
+                                            <span className="text-xs font-semibold text-[#1A1D20]">Limit: {detail.cardLimit.toLocaleString('tr-TR')} TL | Kalan Limit: {detail.availableLimit.toLocaleString('tr-TR')} TL | {detail.isCardBlocked ? '⚠️ Blokeli' : '✅ Aktif'}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="text-[10px] text-[#718096] font-bold uppercase tracking-wider block mb-1">Hesap Bakiyesi & Durum</span>
+                                            <span className="text-xs font-semibold text-[#1A1D20]">Bakiye: {detail.availableLimit.toLocaleString('tr-TR')} TL | {detail.isCardBlocked ? '⚠️ Blokeli' : '✅ Aktif'}</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 

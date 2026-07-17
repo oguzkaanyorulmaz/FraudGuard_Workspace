@@ -34,7 +34,6 @@ namespace FraudGuard.API.Controllers
             }
             catch (Exception ex)
             {
-                // Hatayı tam burada yakalayıp konsola dökeceğiz
                 Console.WriteLine($"🚨 İŞLEM HATASI: {ex.Message}");
                 if (ex.InnerException != null) 
                     Console.WriteLine($"🔍 INNER EXCEPTION: {ex.InnerException.Message}");
@@ -42,5 +41,25 @@ namespace FraudGuard.API.Controllers
                 return StatusCode(500, new { message = "Hata detayına terminalden bak!", error = ex.Message });
             }
         }
+
+                [HttpPost("transfer")]
+        public async Task<IActionResult> ProcessTransfer([FromBody] ProcessTransferRequest request)
+        {
+            try
+            {
+                var response = await _transactionAppService.ProcessTransferAsync(request);
+                if (response.IsSuccess)
+                {
+                    await _hubContext.Clients.All.SendAsync("RefreshLogs");
+                }
+                return response.IsSuccess ? Ok(response) : BadRequest(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🚨 TRANSFER HATASI: {ex.Message}");
+                return StatusCode(500, new { message = "Hata detayına terminalden bak!", error = ex.Message });
+            }
+        }
+
     }
 }

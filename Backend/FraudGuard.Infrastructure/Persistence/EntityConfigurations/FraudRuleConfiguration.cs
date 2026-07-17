@@ -9,7 +9,7 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
         public void Configure(EntityTypeBuilder<EFraudRule> builder)
         {
             builder.HasKey(f => f.RuleId);
-            builder.Property(f => f.RuleCode).IsRequired().HasMaxLength(20);
+            builder.Property(f => f.RuleCode).IsRequired().HasMaxLength(50);
             builder.HasIndex(f => f.RuleCode).IsUnique();
             builder.Property(f => f.RuleName).IsRequired().HasMaxLength(100);
             builder.Property(f => f.Description).HasMaxLength(250);

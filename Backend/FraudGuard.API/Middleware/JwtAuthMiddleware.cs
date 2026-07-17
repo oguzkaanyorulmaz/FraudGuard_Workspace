@@ -20,18 +20,17 @@ namespace FraudGuard.API.Middleware
 
         public async Task InvokeAsync(HttpContext context)
         {
-            // OPTIONS isteklerini geç (CORS preflight)
             if (context.Request.Method == "OPTIONS")
             {
                 await _next(context);
                 return;
             }
 
-            // Login, Swagger ve SignalR yollarını atla
             var path = context.Request.Path.Value?.ToLower() ?? "";
             if (path.Contains("/api/auth/login") ||
                 path.Contains("/api/auth/register") ||
-                path.Contains("/api/transactions/process") || // Bunu ekleyerek token zorunluluğunu kaldırabilirsiniz
+                path.Contains("/api/transactions/process") ||
+                path.Contains("/api/transactions/transfer") ||
                 path.Contains("/swagger") ||
                 path.Contains("/fraudhub"))
             {
