@@ -1,14 +1,14 @@
+using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FraudGuard.Domain.Interfaces.Rules
 {
     public interface IFraudRule
     {
-        int RuleId { get; } 
-        
+        string RuleCode { get; }
         string RuleName { get; }
-
-        bool IsSuspicious(ETransaction currentTx, List<ETransaction> history);
+        Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history);
     }
 }

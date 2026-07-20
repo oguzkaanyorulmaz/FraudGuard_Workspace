@@ -8,19 +8,22 @@ using System.Threading.Tasks;
 
 namespace FraudGuard.Domain.Services.Rules
 {
-    public class HighRiskMccRule : IFraudRule
+    public class CurrencyMismatchRule : IFraudRule
     {
-        public string RuleCode => "HIGH_RISK_MCC";
-        public string RuleName => "Yüksek Riskli İşyeri Tipi (High-Risk MCC)";
+        public string RuleCode => "CURRENCY_MISMATCH";
+        public string RuleName => "Para Birimi Sapması (Currency Mismatch)";
 
         public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
         {
             if (input.PaymentType == PaymentTypeEnum.CreditCard || input.PaymentType == PaymentTypeEnum.DebitCard)
             {
-                string[] highRiskMcc = { "Kuyumcu", "Kripto Para Borsası", "Bahis Sitesi" };
-                if (highRiskMcc.Contains(input.MerchantCategory) && input.Amount >= 10000)
+                if (input.Currency != "TRY")
                 {
-                    return Task.FromResult((true, (string?)$"Yüksek riskli işyerinden ({input.MerchantCategory}) 10.000 TL ve üzeri harcama denemesi."));
+                    bool hasUsedCurrencyBefore = history.Any(t => t.Currency == input.Currency && t.Status == "Approved");
+                    if (!hasUsedCurrencyBefore)
+                    {
+                        return Task.FromResult((true, (string?)$"Geçmişte onaylanmış {input.Currency} işlemi bulunmamasına rağmen döviz cinsinden işlem denemesi."));
+                    }
                 }
             }
 

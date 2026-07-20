@@ -1,30 +1,30 @@
+using FraudGuard.Domain.Common.Enums;
+using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Rules;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace FraudGuard.Domain.Services.Rules
 {
     public class CrossBorderRule : IFraudRule
     {
-        public int RuleId => 6; 
-        public string RuleName => "Sınır Ötesi İşlem (Cross Border)";
+        public string RuleCode => "CROSS_BORDER";
+        public string RuleName => "Beklenmedik Sınır Ötesi İşlem (Cross-Border)";
 
-        public bool IsSuspicious(ETransaction currentTx, List<ETransaction> history)
+        public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
         {
-            if (currentTx.Country.Trim().ToLower() != "türkiye")
+            if (input.PaymentType == PaymentTypeEnum.CreditCard || input.PaymentType == PaymentTypeEnum.DebitCard)
             {
-                bool hasPreviousForeignTx = history.Any(tx => 
-                    tx.Country.Trim().ToLower() == currentTx.Country.Trim().ToLower() && 
-                    tx.Status == "Approved");
-
-                if (!hasPreviousForeignTx)
+                bool hasForeignTxBefore = history.Any(t => t.Country != "Türkiye");
+                if (!hasForeignTxBefore && input.Country != "Türkiye")
                 {
-                    return true;
+                    return Task.FromResult((true, (string?)"Müşterinin geçmişinde yurt dışı işlemi bulunmamasına rağmen aniden sınır ötesi işlem denendi."));
                 }
             }
 
-            return false;
+            return Task.FromResult((false, (string?)null));
         }
     }
 }

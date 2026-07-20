@@ -22,7 +22,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
 
         public async Task<EDebitCard> GetByIBANAsync(string iban)
         {
-            return await _context.DebitCards.FirstOrDefaultAsync(d => d.IBAN == iban);
+            return await _context.DebitCards.Include(d => d.Customer).FirstOrDefaultAsync(d => d.IBAN == iban);
         }
 
         public async Task<EDebitCard> GetByIdAsync(int cardId)

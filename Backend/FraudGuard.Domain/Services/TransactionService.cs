@@ -15,6 +15,8 @@ namespace FraudGuard.Domain.Services
         private readonly IDebitCardRepository _debitCardRepository;
         private readonly ITransactionRepository _transactionRepository;
         private readonly IFraudEvaluationService _fraudEvaluationService;
+        private readonly IBankAccountBeneficiaryRepository _bankAccountBeneficiaryRepository;
+        private readonly ICurrencyService _currencyService;
         private readonly IUnitOfWork _unitOfWork;
 
         public TransactionService(
@@ -22,12 +24,16 @@ namespace FraudGuard.Domain.Services
             IDebitCardRepository debitCardRepository,
             ITransactionRepository transactionRepository,
             IFraudEvaluationService fraudEvaluationService,
+            IBankAccountBeneficiaryRepository bankAccountBeneficiaryRepository,
+            ICurrencyService currencyService,
             IUnitOfWork unitOfWork)
         {
             _creditCardRepository = creditCardRepository;
             _debitCardRepository = debitCardRepository;
             _transactionRepository = transactionRepository;
             _fraudEvaluationService = fraudEvaluationService;
+            _bankAccountBeneficiaryRepository = bankAccountBeneficiaryRepository;
+            _currencyService = currencyService;
             _unitOfWork = unitOfWork;
         }
 
@@ -60,7 +66,9 @@ namespace FraudGuard.Domain.Services
                     return result;
                 }
 
-                if (senderDebit.Balance < input.Amount)
+                decimal processedAmount = await _currencyService.ConvertToTryAsync(input.Amount, input.Currency);
+
+                if (senderDebit.Balance < processedAmount)
                 {
                     result.Status = "Declined";
                     result.DeclineReason = "Yetersiz Bakiye.";
@@ -75,6 +83,19 @@ namespace FraudGuard.Domain.Services
                     return result;
                 }
 
+                if (receiverDebit != null)
+                {
+                    string dbFullName = $"{receiverDebit.Customer.FirstName} {receiverDebit.Customer.LastName}".Trim();
+                    string inputFullName = (input.ReceiverName ?? "").Trim();
+                    
+                    if (!string.Equals(dbFullName, inputFullName, StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        result.Status = "Declined";
+                        result.DeclineReason = "Alıcı adı ve IBAN uyuşmuyor.";
+                        return result;
+                    }
+                }
+
                 var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, senderDebit.CardId);
                 bool isSuspicious = !string.IsNullOrEmpty(evaluationResult.RuleCode);
 
@@ -82,17 +103,34 @@ namespace FraudGuard.Domain.Services
                 {
                     result.Status = "Suspicious";
                     result.DeclineReason = $"Fraud Şüphesi: {evaluationResult.RuleCode}";
+
+                    // Para gönderici bakiyesinden geçici olarak düşülür (bloke/hold edilir)
+                    senderDebit.Balance -= processedAmount;
+                    await _debitCardRepository.UpdateAsync(senderDebit);
                 }
                 else
                 {
-                    senderDebit.Balance -= input.Amount;
+                    senderDebit.Balance -= processedAmount;
                     if (receiverDebit != null)
                     {
-                        receiverDebit.Balance += input.Amount;
+                        receiverDebit.Balance += processedAmount;
                         await _debitCardRepository.UpdateAsync(receiverDebit);
                     }
                     await _debitCardRepository.UpdateAsync(senderDebit);
                     result.Status = "Approved";
+
+                    bool hasBeneficiary = await _bankAccountBeneficiaryRepository.AnyAsync(senderDebit.CustomerId, input.ReceiverIBAN);
+                    if (!hasBeneficiary)
+                    {
+                        var beneficiary = new EBankAccountBeneficiary
+                        {
+                            CustomerId = senderDebit.CustomerId,
+                            ReceiverIBAN = input.ReceiverIBAN,
+                            ReceiverName = input.ReceiverName ?? "Alıcı",
+                            AddedDate = DateTime.Now
+                        };
+                        await _bankAccountBeneficiaryRepository.AddAsync(beneficiary);
+                    }
                 }
 
                 
@@ -104,7 +142,7 @@ namespace FraudGuard.Domain.Services
                     ReceiverName = input.ReceiverName,
                     Description = input.Description,
                     TransactionTypeId = 4,
-                    PaymentTypeId = (int)input.PaymentType,
+                    PaymentType = input.PaymentType,
                     ChannelTypeId = input.ChannelTypeId,
                     Amount = input.Amount,
                     Currency = input.Currency,
@@ -170,32 +208,61 @@ namespace FraudGuard.Domain.Services
                     result.Status = "Approved";
                 }
 
-                decimal processedAmount = input.Amount;
-                if (input.Currency == "USD") processedAmount = input.Amount * 40; 
-                else if (input.Currency == "EUR") processedAmount = input.Amount * 43;
+                decimal processedAmount = await _currencyService.ConvertToTryAsync(input.Amount, input.Currency);
 
                 bool isSuspicious = false;
                 string? triggeredRuleCode = null;
                 string? capturedFraudReason = null;
 
 
-                if ((int)input.TransactionType == 2) 
+                if ((int)input.TransactionType == 2 || (int)input.TransactionType == 3) 
                 {
-                    int unrefundedSalesCount = await _transactionRepository.GetUnrefundedSaleCountAsync(cardId, input.Amount, input.Currency);
-                    if (unrefundedSalesCount <= 0)
+                    if (input.OriginalTransactionId == null)
                     {
                         result.Status = "Declined";
-                        result.DeclineReason = "Belirtilen İade sebebiyle eşleşen satış bulunmamaktadır.";
+                        result.DeclineReason = "Orijinal işlem ID'si belirtilmelidir.";
+                        return result;
                     }
-                    else
+
+                    var originalTx = await _transactionRepository.GetByIdAsync(input.OriginalTransactionId.Value);
+                    if (originalTx == null)
                     {
+                        result.Status = "Declined";
+                        result.DeclineReason = "Orijinal işlem bulunamadı.";
+                        return result;
+                    }
+                    if (originalTx.TransactionTypeId != 1 || originalTx.Status != "Approved")
+                    {
+                        result.Status = "Declined";
+                        result.DeclineReason = "Referans gösterilen işlem onaylanmış bir satış işlemi değildir.";
+                        return result;
+                    }
+                    if ((isCredit && originalTx.CreditCardId != cardId) || (!isCredit && originalTx.DebitCardId != cardId))
+                    {
+                        result.Status = "Declined";
+                        result.DeclineReason = "İşlem yapılan kart, orijinal işlemin kartı ile eşleşmiyor.";
+                        return result;
+                    }
+
+                    if ((int)input.TransactionType == 3) // Void
+                    {
+                        if (originalTx.Amount != input.Amount || originalTx.Currency != input.Currency)
+                        {
+                            result.Status = "Declined";
+                            result.DeclineReason = "İptal tutarı veya para birimi orijinal işlem ile eşleşmiyor.";
+                            return result;
+                        }
+
+                        // Apply card balance refund
                         if (isCredit)
                         {
                             creditCard.AvailableLimit = Math.Min(creditCard.AvailableLimit + processedAmount, creditCard.CardLimit);
+                            await _creditCardRepository.UpdateAsync(creditCard);
                         }
                         else
                         {
                             debitCard.Balance += processedAmount;
+                            await _debitCardRepository.UpdateAsync(debitCard);
                         }
 
                         var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
@@ -205,25 +272,77 @@ namespace FraudGuard.Domain.Services
                         isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
                         if (isSuspicious)
                         {
+                            originalTx.Status = "SuspiciousVoid";
+                            await _unitOfWork.SaveChangesAsync();
+
+                            await _fraudEvaluationService.CreateFraudLogAsync(originalTx.TransactionId, triggeredRuleCode);
+                            await _unitOfWork.SaveChangesAsync();
+
                             result.Status = "Suspicious";
                             result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                            result.TransactionId = originalTx.TransactionId;
+                            return result;
                         }
                         else
                         {
+                            originalTx.Status = "Void";
+                            originalTx.RefundTime = DateTime.Now;
+                            await _unitOfWork.SaveChangesAsync();
+
                             result.Status = "Approved";
+                            result.TransactionId = originalTx.TransactionId;
+                            return result;
                         }
                     }
-                }
-                else if ((int)input.TransactionType == 3)
-                {
-                    result.Status = "Approved";
-                    if (isCredit)
+                    else // Refund
                     {
-                        creditCard.AvailableLimit += processedAmount;
-                    }
-                    else
-                    {
-                        debitCard.Balance += processedAmount;
+                        if (originalTx.Amount != input.Amount || originalTx.Currency != input.Currency)
+                        {
+                            result.Status = "Declined";
+                            result.DeclineReason = "İade tutarı veya para birimi orijinal işlem ile eşleşmiyor.";
+                            return result;
+                        }
+
+                        // Apply card balance refund
+                        if (isCredit)
+                        {
+                            creditCard.AvailableLimit = Math.Min(creditCard.AvailableLimit + processedAmount, creditCard.CardLimit);
+                            await _creditCardRepository.UpdateAsync(creditCard);
+                        }
+                        else
+                        {
+                            debitCard.Balance += processedAmount;
+                            await _debitCardRepository.UpdateAsync(debitCard);
+                        }
+
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
+                        triggeredRuleCode = evaluationResult.RuleCode;
+                        capturedFraudReason = evaluationResult.FraudReason;
+                        
+                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
+                        if (isSuspicious)
+                        {
+                            originalTx.Status = "SuspiciousRefund";
+                            await _unitOfWork.SaveChangesAsync();
+
+                            await _fraudEvaluationService.CreateFraudLogAsync(originalTx.TransactionId, triggeredRuleCode);
+                            await _unitOfWork.SaveChangesAsync();
+
+                            result.Status = "Suspicious";
+                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                            result.TransactionId = originalTx.TransactionId;
+                            return result;
+                        }
+                        else
+                        {
+                            originalTx.Status = "Refund";
+                            originalTx.RefundTime = DateTime.Now;
+                            await _unitOfWork.SaveChangesAsync();
+
+                            result.Status = "Approved";
+                            result.TransactionId = originalTx.TransactionId;
+                            return result;
+                        }
                     }
                 }
                 else if ((int)input.TransactionType == 1)
@@ -246,17 +365,22 @@ namespace FraudGuard.Domain.Services
                         capturedFraudReason = evaluationResult.FraudReason;
                         
                         isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
-                        if (isSuspicious)
-                        {
-                            result.Status = "Suspicious";
-                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
-                        }
-                        else if (isInitialDecline)
+                        if (isInitialDecline)
                         {
                             result.Status = "Declined";
                         }
                         else
                         {
+                            if (isSuspicious)
+                            {
+                                result.Status = "Suspicious";
+                                result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                            }
+                            else
+                            {
+                                result.Status = "Approved";
+                            }
+
                             if (isCredit)
                             {
                                 creditCard.AvailableLimit -= processedAmount;
@@ -275,7 +399,7 @@ namespace FraudGuard.Domain.Services
                     CreditCardId = isCredit ? cardId : null,
                     DebitCardId = isCredit ? null : cardId,
                     TransactionTypeId = (int)input.TransactionType,
-                    PaymentTypeId = (int)input.PaymentType,
+                    PaymentType = input.PaymentType,
                     ChannelTypeId = input.ChannelTypeId == 0 ? 2 : input.ChannelTypeId,
                     Amount = input.Amount,
                     Currency = input.Currency,
@@ -285,7 +409,8 @@ namespace FraudGuard.Domain.Services
                     MerchantCategory = input.MerchantCategory,
                     Status = result.Status,
                     DeclineReason = result.Status == "Suspicious" ? $"Fraud: {triggeredRuleCode}" : result.DeclineReason,
-                    FraudReason = capturedFraudReason 
+                    FraudReason = capturedFraudReason,
+                    OriginalTransactionId = input.OriginalTransactionId
                 };
 
                 await _transactionRepository.AddAsync(newTransaction);

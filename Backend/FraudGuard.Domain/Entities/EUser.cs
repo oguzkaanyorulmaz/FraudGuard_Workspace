@@ -13,8 +13,7 @@ namespace FraudGuard.Domain.Entities
 
         public bool IsPasswordValid(string inputPassword, ICryptService cryptService)
         {
-            string hashedInput = cryptService.HashPassword(inputPassword);
-            return hashedInput == this.PasswordUnderSHA256;
+            return cryptService.VerifyPassword(inputPassword, this.PasswordUnderSHA256);
         }
     }
 }

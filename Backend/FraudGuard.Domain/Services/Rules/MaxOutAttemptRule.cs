@@ -1,27 +1,40 @@
+using FraudGuard.Domain.Common.Enums;
+using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
+using FraudGuard.Domain.Interfaces.Repositories;
 using FraudGuard.Domain.Interfaces.Rules;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FraudGuard.Domain.Services.Rules
 {
     public class MaxOutAttemptRule : IFraudRule
     {
-        public int RuleId => 8; 
-        public string RuleName => "Limit Boşaltma Denemesi (Max-Out Attempt)";
+        private readonly ICreditCardRepository _creditCardRepository;
 
-        public bool IsSuspicious(ETransaction currentTx, List<ETransaction> history)
+        public MaxOutAttemptRule(ICreditCardRepository creditCardRepository)
         {
-            if (currentTx.CreditCard != null && currentTx.CreditCard.CardLimit > 0)
-            {
-                decimal maxOutThreshold = currentTx.CreditCard.CardLimit * 0.95m;
+            _creditCardRepository = creditCardRepository;
+        }
 
-                if (currentTx.Amount >= maxOutThreshold)
+        public string RuleCode => "MAX_OUT";
+        public string RuleName => "Limit Boşaltma Denemesi (Max-Out)";
+
+        public async Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
+        {
+            if (input.PaymentType == PaymentTypeEnum.CreditCard)
+            {
+                var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                if (cc != null && cc.AvailableLimit > 0)
                 {
-                    return true;
+                    if (input.Amount >= cc.AvailableLimit * 0.95m)
+                    {
+                        return (true, "Kredi kartı kullanılabilir limitinin %95'i tek işlemle boşaltılmaya çalışılıyor.");
+                    }
                 }
             }
 
-            return false;
+            return (false, null);
         }
     }
 }

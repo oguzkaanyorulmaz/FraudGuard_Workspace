@@ -17,7 +17,7 @@ namespace FraudGuard.Domain.Entities
         public string? Description { get; set; }
 
         public int TransactionTypeId { get; set; } 
-        public int PaymentTypeId { get; set; }
+        public PaymentTypeEnum PaymentType { get; set; }
         public int ChannelTypeId { get; set; } 
         public string Currency { get; set; } = "TRY";
         
@@ -33,8 +33,11 @@ namespace FraudGuard.Domain.Entities
         public virtual ECreditCard? CreditCard { get; set; }
         public virtual EDebitCard? DebitCard { get; set; }
         public virtual ETransactionType TransactionType { get; set; }
-        public virtual EPaymentType PaymentType { get; set; }
         public virtual EChannelType ChannelType { get; set; }
         public virtual EFraudLog FraudLog { get; set; }
+
+        public int? OriginalTransactionId { get; set; }
+        public virtual ETransaction? OriginalTransaction { get; set; }
+        public DateTime? RefundTime { get; set; }
     }
 }

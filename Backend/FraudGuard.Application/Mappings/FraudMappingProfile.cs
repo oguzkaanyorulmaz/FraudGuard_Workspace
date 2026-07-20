@@ -21,12 +21,7 @@ namespace FraudGuard.Application.Mappings
                      (src.Transaction.SenderIBAN != null ? src.Transaction.SenderIBAN : "Bilinmiyor"))))
                 .ForMember(dest => dest.TransactionDate, opt => opt.MapFrom(src => src.Transaction.TransactionDate))
                 .ForMember(dest => dest.PaymentTypeCode, opt => opt.MapFrom(src => 
-                    src.Transaction == null ? "Unknown" :
-                    src.Transaction.PaymentTypeId == 1 ? "CreditCard" :
-                    src.Transaction.PaymentTypeId == 2 ? "DebitCard" :
-                    src.Transaction.PaymentTypeId == 3 ? "BankTransfer" :
-                    src.Transaction.PaymentTypeId == 4 ? "EFT" :
-                    src.Transaction.PaymentTypeId == 5 ? "DigitalWallet" : "Unknown"));
+                    src.Transaction == null ? "Unknown" : src.Transaction.PaymentType.ToString()));
 
 
             CreateMap<EFraudRule, GetActiveRulesResponse>();

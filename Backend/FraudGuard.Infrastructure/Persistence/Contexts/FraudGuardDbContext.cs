@@ -18,7 +18,6 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
         public DbSet<EChannelType> ChannelTypes { get; set; }
         public DbSet<EBankAccountBeneficiary> BankAccountBeneficiaries { get; set; }
         public DbSet<ETransactionType> TransactionTypes { get; set; } 
-        public DbSet<EPaymentType> PaymentTypes { get; set; } 
         public DbSet<EUser> Users { get; set; }
 
         public DbSet<EFraudRule> FraudRules { get; set; }
@@ -62,7 +61,9 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                 new EFraudRule { RuleId = 17, RuleCode = "SUSPICIOUS_DESCRIPTION", RuleName = "Şüpheli İşlem Açıklaması", Description = "Açıklamada bahis, kripto vb. yasaklı kelimelerin bulunması", IsActive = true },
                 new EFraudRule { RuleId = 18, RuleCode = "HIGH_RISK_RECEIVER", RuleName = "Şüpheli Alıcı/Katır Hesap", Description = "Gönderilen IBAN'ın sistemde kara listede olması", IsActive = true },
                 new EFraudRule { RuleId = 19, RuleCode = "MULTI_SENDER_TO_SINGLE_RECEIVER", RuleName = "Tek Alıcıya Çoklu Gönderim", Description = "Aynı alıcıya kısa sürede farklı kişilerden para transferi", IsActive = true },
-                new EFraudRule { RuleId = 20, RuleCode = "RECEIVER_BALANCE_ANOMALY", RuleName = "Katır Hesap Bakiye Sapması", Description = "Pasif hesaba ani bakiye gelip 1 saatte nakit çekilmeye çalışılması", IsActive = true }
+                new EFraudRule { RuleId = 20, RuleCode = "RECEIVER_BALANCE_ANOMALY", RuleName = "Katır Hesap Bakiye Sapması", Description = "Pasif hesaba ani bakiye gelip 1 saatte nakit çekilmeye çalışılması", IsActive = true },
+                new EFraudRule { RuleId = 21, RuleCode = "LATE_VOID", RuleName = "Gecikmiş İptal Kuralı", Description = "Orijinal işlem tarihinden 2 saatten fazla süre geçtikten sonra iptal (Void) işlemi yapılmaya çalışılması", IsActive = true },
+                new EFraudRule { RuleId = 22, RuleCode = "HIGH_VALUE_REFUND_VOID", RuleName = "Yüksek Tutarlı İptal/İade Kuralı", Description = "Tek seferde 10.000 TL ve üzerinde İade (Refund) ya da İptal (Void) işlemi yapılması", IsActive = true }
             );
 
             // 3. Block Reasons Seeding
@@ -72,14 +73,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                 new EBlockReason { ReasonId = 3, ReasonCode = "Lost", Description = "Kayıp" }
             );
 
-            // 4. Payment Types Seeding
-            modelBuilder.Entity<EPaymentType>().HasData(
-                new EPaymentType { PaymentTypeId = 1, TypeCode = "CreditCard", Description = "Kredi Kartı" },
-                new EPaymentType { PaymentTypeId = 2, TypeCode = "DebitCard", Description = "Banka Kartı" },
-                new EPaymentType { PaymentTypeId = 3, TypeCode = "BankTransfer", Description = "Havale" },
-                new EPaymentType { PaymentTypeId = 4, TypeCode = "EFT", Description = "EFT" },
-                new EPaymentType { PaymentTypeId = 5, TypeCode = "DigitalWallet", Description = "Dijital Cüzdan" }
-            );
+
 
             // 5. Customers Seeding (1-20)
             var customers = new List<ECustomer>();
@@ -168,7 +162,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     CreditCardId = 9,
                     DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentTypeId = 1, // CreditCard
+                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "EUR",
                     Amount = 100,
@@ -188,7 +182,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     ReceiverIBAN = "TR110006200000000001000012",
                     ReceiverName = "Musteri12",
                     TransactionTypeId = 1, // Sale (Load)
-                    PaymentTypeId = 1, // CreditCard
+                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 10000,
@@ -208,7 +202,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     ReceiverIBAN = "TR110006200000000001000013",
                     ReceiverName = "Musteri13",
                     TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentTypeId = 4, // EFT
+                    PaymentType = PaymentTypeEnum.EFT,
                     ChannelTypeId = 4, // Mobile
                     Currency = "TRY",
                     Amount = 5000,
@@ -227,7 +221,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     ReceiverIBAN = "TR110006200000000001000013",
                     ReceiverName = "Musteri13",
                     TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentTypeId = 4, // EFT
+                    PaymentType = PaymentTypeEnum.EFT,
                     ChannelTypeId = 4, // Mobile
                     Currency = "TRY",
                     Amount = 5000,
@@ -247,7 +241,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     ReceiverIBAN = "TR110006200000000001000019",
                     ReceiverName = "Musteri19",
                     TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentTypeId = 4, // EFT
+                    PaymentType = PaymentTypeEnum.EFT,
                     ChannelTypeId = 4, // Mobile
                     Currency = "TRY",
                     Amount = 1000,
@@ -266,7 +260,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     ReceiverIBAN = "TR110006200000000001000019",
                     ReceiverName = "Musteri19",
                     TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentTypeId = 4, // EFT
+                    PaymentType = PaymentTypeEnum.EFT,
                     ChannelTypeId = 4, // Mobile
                     Currency = "TRY",
                     Amount = 1000,
@@ -285,7 +279,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     ReceiverIBAN = "TR110006200000000001000019",
                     ReceiverName = "Musteri19",
                     TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentTypeId = 4, // EFT
+                    PaymentType = PaymentTypeEnum.EFT,
                     ChannelTypeId = 4, // Mobile
                     Currency = "TRY",
                     Amount = 1000,
@@ -302,7 +296,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     CreditCardId = 10,
                     DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentTypeId = 1, // CreditCard
+                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -318,7 +312,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     CreditCardId = 10,
                     DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentTypeId = 1, // CreditCard
+                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -334,7 +328,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     CreditCardId = 10,
                     DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentTypeId = 1, // CreditCard
+                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -350,7 +344,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     CreditCardId = 10,
                     DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentTypeId = 1, // CreditCard
+                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -366,7 +360,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     CreditCardId = 10,
                     DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentTypeId = 1, // CreditCard
+                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,

@@ -40,5 +40,19 @@ services:
     depends_on:
       - backend
 
+  # 4. Transaction Simulator Servisi
+  simulator:
+    build:
+      context: ./TransactionSimulator
+      dockerfile: Dockerfile
+    container_name: fraudguard-simulator
+    ports:
+      - "4000:4000"
+    environment:
+      - API_HOST=backend
+      - API_PORT=8080
+    depends_on:
+      - backend
+
 volumes:
   mssql-data: # Veritabanının konteyner kapandığında silinmemesi için kalıcı disk alanı

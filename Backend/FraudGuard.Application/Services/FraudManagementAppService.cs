@@ -4,12 +4,11 @@ using FraudGuard.Application.DTOs.FraudManagement;
 using FraudGuard.Application.Interfaces;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Repositories; 
-using System.Linq; 
-using Microsoft.EntityFrameworkCore; 
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Application.Helpers;
+using FraudGuard.Domain.Entities;
 
 
 namespace FraudGuard.Application.Services
@@ -57,9 +56,7 @@ namespace FraudGuard.Application.Services
 
                     item.RiskScore = CalculateRiskScore(
                         originalLog.FraudRule.RuleCode,
-                        tx.Amount,
-                        limit,
-                        available
+                        tx
                     );
                 }
                 else
@@ -181,9 +178,7 @@ namespace FraudGuard.Application.Services
 
                     item.RiskScore = CalculateRiskScore(
                         originalLog.FraudRule.RuleCode,
-                        tx.Amount,
-                        limit,
-                        available
+                        tx
                     );
                 }
                 else
@@ -195,40 +190,111 @@ namespace FraudGuard.Application.Services
             return ResponseDTO<List<GetUnresolvedLogsResponse>>.Success(responseList);
         }
 
-        private int CalculateRiskScore(string ruleCode, decimal txAmount, decimal cardLimit, decimal availableLimit)
+        private int CalculateRiskScore(string ruleCode, ETransaction tx)
         {
+            // 1. Baz Kural Ağırlığı
             int ruleWeight = ruleCode switch
             {
                 "IMPOSSIBLE_TRAVEL" => 95,
                 "BRUTE_FORCE" => 90,
                 "MAX_OUT" => 85,
-                "ANOMALOUS_TIME" => 80,
+                "ANOMALOUS_TIME" => 85,
+                "HIGH_RISK_RECEIVER" => 85,
+                "WALLET_CASHOUT" => 80,
+                "NEW_BENEFICIARY_TRANSFER" => 75,
                 "CARD_TESTING" => 75,
                 "CROSS_BORDER" => 70,
+                "CROSS_BORDER_TRANSFER" => 70,
                 "HIGH_RISK_MCC" => 65,
+                "MULTI_SENDER_TO_SINGLE_RECEIVER" => 65,
+                "MULTI_SOURCE_FUNDING" => 65,
+                "RECEIVER_BALANCE_ANOMALY" => 60,
                 "CONSECUTIVE_REFUNDS" => 60,
                 "CURRENCY_MISMATCH" => 55,
                 "VELOCITY" => 50,
+                "SMURFING" => 50,
+                "SUSPICIOUS_DESCRIPTION" => 45,
                 _ => 60
             };
 
-            decimal limitEtki = 0;
+            // 2. Kanal Çarpanı
+            decimal channelFactor = tx.ChannelTypeId switch
+            {
+                2 => 1.3m, // Sanal POS
+                3 => 1.2m, // ATM
+                1 => 1.0m, // POS
+                4 => 0.85m, // Mobil Şube
+                5 => 0.85m, // İnternet Şubesi
+                _ => 1.0m
+            };
+
+            // 3. İşyeri Kategorisi Çarpanı
+            decimal categoryFactor = 1.0m;
+            if (!string.IsNullOrEmpty(tx.MerchantCategory))
+            {
+                string category = tx.MerchantCategory.ToLower();
+                if (category.Contains("kuyumcu") || category.Contains("kripto") || category.Contains("bahis") || category.Contains("kumar"))
+                    categoryFactor = 1.4m;
+                else if (category.Contains("elektronik") || category.Contains("seyahat") || category.Contains("otel") || category.Contains("konaklama"))
+                    categoryFactor = 1.2m;
+                else if (category.Contains("e-ticaret") || category.Contains("transfer"))
+                    categoryFactor = 1.1m;
+                else if (category.Contains("market") || category.Contains("giyim") || category.Contains("restoran") || category.Contains("yemek"))
+                    categoryFactor = 0.8m;
+            }
+
+            // 4. İşlem Tipi Çarpanı
+            decimal typeFactor = tx.TransactionTypeId switch
+            {
+                2 => 1.2m, // Refund (İade)
+                3 => 0.7m, // Void (İptal)
+                _ => 1.0m  // Sale / Transfer
+            };
+
+            // 5. Para Birimi Çarpanı
+            decimal currencyFactor = (!string.IsNullOrEmpty(tx.Currency) && tx.Currency != "TRY") ? 1.2m : 1.0m;
+
+            // 6. Konum/Ülke Çarpanı
+            decimal countryFactor = (!string.IsNullOrEmpty(tx.Country) && tx.Country.ToLower() != "türkiye") ? 1.3m : 1.0m;
+
+            // Katsayıların Bileşkesi
+            decimal combinedFactor = channelFactor * categoryFactor * typeFactor * currencyFactor * countryFactor;
+
+            // 7. Bakiye / Limit Oranı Hesaplama
+            decimal limitOranEtkisi = 0;
+            decimal cardLimit = 0;
+            decimal availableLimit = 0;
+
+            if (tx.CreditCard != null)
+            {
+                cardLimit = tx.CreditCard.CardLimit;
+                availableLimit = tx.CreditCard.AvailableLimit;
+            }
+            else if (tx.DebitCard != null)
+            {
+                cardLimit = 100000; // Varsayılan limit eşiği
+                availableLimit = tx.DebitCard.Balance;
+            }
+
             if (cardLimit > 0)
             {
                 decimal spentLimit = System.Math.Max(0, cardLimit - availableLimit);
-                decimal txRatio = (txAmount / cardLimit) * 100;
+                decimal txRatio = (tx.Amount / cardLimit) * 100;
                 decimal spentRatio = (spentLimit / cardLimit) * 100;
-                limitEtki = (txRatio * 0.5m) + (spentRatio * 0.5m);
-                if (limitEtki > 100) limitEtki = 100;
+                limitOranEtkisi = (txRatio * 0.6m) + (spentRatio * 0.4m);
+                if (limitOranEtkisi > 100) limitOranEtkisi = 100;
             }
 
-            decimal hacimSkoru = System.Math.Min((txAmount / 50000m) * 100m, 100m);
-            
-            decimal factor = ((limitEtki * 0.5m) + (hacimSkoru * 0.5m)) / 100m;
-            
-            decimal totalScore = ruleWeight + (100m - ruleWeight) * factor;
+            // Hacim Skoru (Tek işlem tutarının büyüklüğü)
+            decimal volumeScore = System.Math.Min((tx.Amount / 50000m) * 100m, 100m);
 
-            int finalScore = (int)System.Math.Round(totalScore);
+            // Dinamik Faktör (%50 Limit Kullanım Oranı + %50 İşlem Hacmi)
+            decimal dynamicFactor = ((limitOranEtkisi * 0.5m) + (volumeScore * 0.5m)) / 100m;
+
+            // Risk Skoru Hesaplama
+            decimal rawScore = (ruleWeight * combinedFactor) + (100m - ruleWeight) * dynamicFactor;
+
+            int finalScore = (int)System.Math.Round(rawScore);
             return System.Math.Clamp(finalScore, 1, 100);
         }
     }

@@ -36,11 +36,17 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
         {
             if (isCreditCard)
             {
-                return await _context.Transactions.AnyAsync(t => t.CreditCardId == cardId && t.Status == "Suspicious");
+                return await _context.Transactions.AnyAsync(t => 
+                    t.CreditCardId == cardId && 
+                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.Status == "SuspiciousVoid" || 
+                     (t.FraudLog != null && !t.FraudLog.IsResolved)));
             }
             else
             {
-                return await _context.Transactions.AnyAsync(t => t.DebitCardId == cardId && t.Status == "Suspicious");
+                return await _context.Transactions.AnyAsync(t => 
+                    t.DebitCardId == cardId && 
+                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.Status == "SuspiciousVoid" || 
+                     (t.FraudLog != null && !t.FraudLog.IsResolved)));
             }
         }
         public async Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId)
@@ -80,6 +86,32 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
             return await _context.Transactions
                 .Where(t => t.ReceiverIBAN == receiverIBAN && t.TransactionDate >= cutoffTime)
                 .ToListAsync();
+        }
+
+        public async Task<ETransaction?> GetByIdAsync(int id)
+        {
+            return await _context.Transactions
+                .Include(t => t.CreditCard)
+                .Include(t => t.DebitCard)
+                .FirstOrDefaultAsync(t => t.TransactionId == id);
+        }
+
+        public async Task<bool> HasBeenVoidedAsync(int originalTransactionId)
+        {
+            return await _context.Transactions.AnyAsync(t => 
+                t.OriginalTransactionId == originalTransactionId && 
+                t.TransactionTypeId == 3 && // 3: Void
+                (t.Status == "Approved" || t.Status == "Suspicious"));
+        }
+
+        public async Task<decimal> GetTotalRefundedAmountAsync(int originalTransactionId)
+        {
+            return await _context.Transactions
+                .Where(t => 
+                    t.OriginalTransactionId == originalTransactionId && 
+                    t.TransactionTypeId == 2 && // 2: Refund
+                    (t.Status == "Approved" || t.Status == "Suspicious"))
+                .SumAsync(t => t.Amount);
         }
     }
 }

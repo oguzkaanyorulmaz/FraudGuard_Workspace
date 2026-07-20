@@ -17,5 +17,6 @@ namespace FraudGuard.Application.DTOs.TransactionProcessing
         public string Location { get; set; }
         public string Country { get; set; } = "Türkiye";
         public string MerchantCategory { get; set; }
+        public int? OriginalTransactionId { get; set; }
     }
 }

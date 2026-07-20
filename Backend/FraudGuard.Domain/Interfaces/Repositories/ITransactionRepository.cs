@@ -13,5 +13,8 @@ namespace FraudGuard.Domain.Interfaces.Repositories
         Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId);
         Task<int> GetUnrefundedSaleCountAsync(int cardId, decimal amount, string currency);
         Task<List<ETransaction>> GetRecentTransactionsByReceiverIBANAsync(string receiverIBAN, TimeSpan timeWindow);
+        Task<ETransaction?> GetByIdAsync(int id);
+        Task<bool> HasBeenVoidedAsync(int originalTransactionId);
+        Task<decimal> GetTotalRefundedAmountAsync(int originalTransactionId);
     }
 }
