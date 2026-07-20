@@ -52,7 +52,6 @@ function Dashboard() {
             { value: 'NEW_BENEFICIARY_TRANSFER', label: 'Yeni Alıcı Transferi' },
             { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
             { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
-            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderici' },
             { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' }
         ],
         CREDIT_CARD: [
@@ -87,11 +86,7 @@ function Dashboard() {
             { value: 'NEW_BENEFICIARY_TRANSFER', label: 'Yeni Alıcı Transferi' },
             { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
             { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
-            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderici' },
             { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' }
-        ],
-        DIGITAL_WALLET: [
-            { value: 'WALLET_CASHOUT', label: 'Wallet Cash-Out' }
         ]
     };
 
@@ -175,6 +170,7 @@ function Dashboard() {
     const handleTopCardClick = (tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
         setSelectedTabs([tab]);
         setSelectedScenario('ALL');
+        setSelectedPaymentType('ALL');
         clearSelection();
     };
 
@@ -183,49 +179,48 @@ function Dashboard() {
         return txn.ruleCode === scenario;
     };
 
+    const getFilteredTransactions = () => {
+        return transactions.filter(txn => {
+            if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
+            if (selectedPaymentType !== 'ALL' && txn.paymentType !== selectedPaymentType) return false;
+            if (!matchScenario(txn, selectedScenario)) return false;
+            return true;
+        });
+    };
+
+    const getFilteredHistory = (action: 'APPROVED' | 'BLOCKED') => {
+        return history.filter(h => {
+            if (h.action !== action) return false;
+            const txn = h.transaction;
+            if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
+            if (selectedPaymentType !== 'ALL' && txn.paymentType !== selectedPaymentType) return false;
+            if (!matchScenario(txn, selectedScenario)) return false;
+            return true;
+        });
+    };
+
     // Filtreleme ve Sıralama Mantığı
     const getFilteredData = () => {
         let sourceData: { transaction: Transaction; historyAction?: 'APPROVED' | 'BLOCKED' }[] = [];
 
         if (selectedTabs.includes('PENDING')) {
-            sourceData = [...sourceData, ...transactions.map(t => ({ transaction: t }))];
+            sourceData = [...sourceData, ...getFilteredTransactions().map(t => ({ transaction: t }))];
         }
         if (selectedTabs.includes('BLOCKED')) {
             sourceData = [
                 ...sourceData,
-                ...history
-                    .filter(h => h.action === 'BLOCKED')
-                    .map(h => ({ transaction: h.transaction, historyAction: 'BLOCKED' as const }))
+                ...getFilteredHistory('BLOCKED').map(h => ({ transaction: h.transaction, historyAction: 'BLOCKED' as const }))
             ];
         }
         if (selectedTabs.includes('APPROVED')) {
             sourceData = [
                 ...sourceData,
-                ...history
-                    .filter(h => h.action === 'APPROVED')
-                    .map(h => ({ transaction: h.transaction, historyAction: 'APPROVED' as const }))
+                ...getFilteredHistory('APPROVED').map(h => ({ transaction: h.transaction, historyAction: 'APPROVED' as const }))
             ];
         }
 
-        const filtered = sourceData.filter(item => {
-            const txn = item.transaction;
 
-            // Arama Terimi Filtresi
-            if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
-
-            // Ödeme Tipi Filtresi
-            if (selectedPaymentType !== 'ALL') {
-                if (txn.paymentType !== selectedPaymentType) return false;
-            }
-
-            // Senaryo Filtresi
-            if (!matchScenario(txn, selectedScenario)) return false;
-
-            return true;
-        });
-
-
-        return [...filtered].sort((a, b) => {
+        return [...sourceData].sort((a, b) => {
             for (const sort of sortFields) {
                 let valA: any;
                 let valB: any;
@@ -331,19 +326,19 @@ function Dashboard() {
                                 onClick={() => toggleTab('PENDING')}
                                 className={selectedTabs.includes('PENDING') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
-                                📂 Bekleyen ({transactions.length})
+                                📂 Bekleyen ({getFilteredTransactions().length})
                             </button>
                             <button
                                 onClick={() => toggleTab('BLOCKED')}
                                 className={selectedTabs.includes('BLOCKED') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
-                                🚫 Blokelenen ({history.filter(h => h.action === 'BLOCKED').length})
+                                🚫 Blokelenen ({getFilteredHistory('BLOCKED').length})
                             </button>
                             <button
                                 onClick={() => toggleTab('APPROVED')}
                                 className={selectedTabs.includes('APPROVED') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
-                                ✅ Onaylanan ({history.filter(h => h.action === 'APPROVED').length})
+                                ✅ Onaylanan ({getFilteredHistory('APPROVED').length})
                             </button>
                         </div>
 
@@ -363,7 +358,6 @@ function Dashboard() {
                                 <option value="CREDIT_CARD">💳 Kredi Kartı</option>
                                 <option value="DEBIT_CARD">🏦 Banka Kartı</option>
                                 <option value="BANK_TRANSFER">💸 EFT / Havale</option>
-                                <option value="DIGITAL_WALLET">📱 Dijital Cüzdan</option>
                             </select>
 
                             {/* Senaryo Seçimi (Dinamik Süzülen) */}

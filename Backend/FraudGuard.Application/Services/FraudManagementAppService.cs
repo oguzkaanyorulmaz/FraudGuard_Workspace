@@ -206,7 +206,6 @@ namespace FraudGuard.Application.Services
                 "CROSS_BORDER" => 70,
                 "CROSS_BORDER_TRANSFER" => 70,
                 "HIGH_RISK_MCC" => 65,
-                "MULTI_SENDER_TO_SINGLE_RECEIVER" => 65,
                 "MULTI_SOURCE_FUNDING" => 65,
                 "RECEIVER_BALANCE_ANOMALY" => 60,
                 "CONSECUTIVE_REFUNDS" => 60,

@@ -33,9 +33,9 @@ namespace FraudGuard.Domain.Services.Rules
                     .Distinct()
                     .Count();
 
-                if (distinctSendersCount == 2)
+                if (distinctSendersCount >= 2)
                 {
-                    return (true, $"Alıcı hesap ({input.ReceiverIBAN}) son 30 dakika içinde 3 farklı hesaptan fonlanmıştır (Çoklu Kaynakla Fonlama).");
+                    return (true, $"Alıcı hesap ({input.ReceiverIBAN}) son 30 dakika içinde 3 veya daha fazla farklı hesaptan fonlanmıştır (Çoklu Kaynakla Fonlama).");
                 }
             }
 

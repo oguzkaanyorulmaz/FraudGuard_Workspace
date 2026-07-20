@@ -28,7 +28,6 @@ namespace FraudGuard.API.Extensions
             services.AddScoped<IFraudRule, NewBeneficiaryTransferRule>();
             services.AddScoped<IFraudRule, SuspiciousDescriptionRule>();
             services.AddScoped<IFraudRule, HighRiskReceiverRule>();
-            services.AddScoped<IFraudRule, MultiSenderToSingleReceiverRule>();
             services.AddScoped<IFraudRule, ReceiverBalanceAnomalyRule>();
 
             return services;

@@ -104,7 +104,6 @@ namespace FraudGuard.Domain.Services
                     result.Status = "Suspicious";
                     result.DeclineReason = $"Fraud Şüphesi: {evaluationResult.RuleCode}";
 
-                    // Para gönderici bakiyesinden geçici olarak düşülür (bloke/hold edilir)
                     senderDebit.Balance -= processedAmount;
                     await _debitCardRepository.UpdateAsync(senderDebit);
                 }
@@ -253,7 +252,6 @@ namespace FraudGuard.Domain.Services
                             return result;
                         }
 
-                        // Apply card balance refund
                         if (isCredit)
                         {
                             creditCard.AvailableLimit = Math.Min(creditCard.AvailableLimit + processedAmount, creditCard.CardLimit);
@@ -303,7 +301,6 @@ namespace FraudGuard.Domain.Services
                             return result;
                         }
 
-                        // Apply card balance refund
                         if (isCredit)
                         {
                             creditCard.AvailableLimit = Math.Min(creditCard.AvailableLimit + processedAmount, creditCard.CardLimit);

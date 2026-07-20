@@ -69,7 +69,6 @@ public async Task<bool> ResolveFraudLogAsync(
                     log.Transaction.Status = "Approved";
                 }
 
-                // EFT/Havale durumunda parayı alıcıya aktar
                 if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.ReceiverIBAN))
                 {
                     var receiverDebit = await _debitCardRepository.GetByIBANAsync(log.Transaction.ReceiverIBAN);

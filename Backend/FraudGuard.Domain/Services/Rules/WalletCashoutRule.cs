@@ -22,7 +22,7 @@ namespace FraudGuard.Domain.Services.Rules
                     t.TransactionDate <= DateTime.Now &&
                     (DateTime.Now - t.TransactionDate).TotalMinutes <= 15 && 
                     t.Status == "Approved" && 
-                    (t.TransactionTypeId == 1 || t.PaymentType == PaymentTypeEnum.DigitalWallet));
+                    t.TransactionTypeId == 1);
                 if (hasRecentIncomingLoad)
                 {
                     return Task.FromResult((true, (string?)"Son 15 dakika içinde karta/hesaba bakiye yüklemesi yapılmasının ardından hemen EFT ile çıkış denemesi (Wallet Cash-Out)."));

@@ -62,7 +62,6 @@ namespace FraudGuard.Domain.Services
             var activeRules = await _fraudRuleRepository.GetAllActiveRulesAsync();
             var activeRuleCodes = activeRules.Where(r => r.IsActive).Select(r => r.RuleCode).ToHashSet();
 
-            // Tüm kuralları sırayla değerlendir
             foreach (var rule in _rules)
             {
                 if (activeRuleCodes.Contains(rule.RuleCode))
