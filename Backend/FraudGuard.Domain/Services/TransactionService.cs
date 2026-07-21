@@ -18,6 +18,7 @@ namespace FraudGuard.Domain.Services
         private readonly IBankAccountBeneficiaryRepository _bankAccountBeneficiaryRepository;
         private readonly ICurrencyService _currencyService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICacheProvider _cacheProvider;
 
         public TransactionService(
             ICreditCardRepository creditCardRepository,
@@ -26,7 +27,8 @@ namespace FraudGuard.Domain.Services
             IFraudEvaluationService fraudEvaluationService,
             IBankAccountBeneficiaryRepository bankAccountBeneficiaryRepository,
             ICurrencyService currencyService,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ICacheProvider cacheProvider)
         {
             _creditCardRepository = creditCardRepository;
             _debitCardRepository = debitCardRepository;
@@ -35,6 +37,7 @@ namespace FraudGuard.Domain.Services
             _bankAccountBeneficiaryRepository = bankAccountBeneficiaryRepository;
             _currencyService = currencyService;
             _unitOfWork = unitOfWork;
+            _cacheProvider = cacheProvider;
         }
 
         public async Task<TransactionCheckResult> ProcessTransactionAsync(ProcessTransactionInput input)
@@ -156,6 +159,14 @@ namespace FraudGuard.Domain.Services
 
                 await _transactionRepository.AddAsync(transferTx);
                 await _unitOfWork.SaveChangesAsync();
+                await _cacheProvider.RemoveAsync($"card_info_{senderDebit.CardNumber}");
+                await _cacheProvider.RemoveAsync($"recent_txs_{senderDebit.CardNumber}");
+                await _cacheProvider.RemoveAsync($"recent_txs_{input.SenderIBAN}");
+                if (receiverDebit != null)
+                {
+                    await _cacheProvider.RemoveAsync($"card_info_{receiverDebit.CardNumber}");
+                    await _cacheProvider.RemoveAsync($"recent_txs_{receiverDebit.CardNumber}");
+                }
 
                 if (isSuspicious && evaluationResult.RuleCode != null)
                 {
@@ -169,16 +180,53 @@ namespace FraudGuard.Domain.Services
 
             else
             {
-                var creditCard = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
-                var debitCard = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
+                string cacheKey = $"card_info_{input.CardNumber}";
+                var cachedCard = await _cacheProvider.GetAsync<FraudGuard.Domain.DomainObjects.CardCacheInfo>(cacheKey);
 
-                if (creditCard == null && debitCard == null)
+                if (cachedCard == null)
+                {
+                    var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                    if (cc != null)
+                    {
+                        cachedCard = new FraudGuard.Domain.DomainObjects.CardCacheInfo { AvailableFunds = cc.AvailableLimit, IsBlocked = cc.IsBlocked, CVV = cc.CVV };
+                    }
+                    else
+                    {
+                        var dc = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
+                        if (dc != null)
+                        {
+                            cachedCard = new FraudGuard.Domain.DomainObjects.CardCacheInfo { AvailableFunds = dc.Balance, IsBlocked = dc.IsBlocked, CVV = dc.CVV };
+                        }
+                    }
+                    if (cachedCard != null)
+                    {
+                        await _cacheProvider.SetAsync(cacheKey, cachedCard, TimeSpan.FromMinutes(5));
+                    }
+                }
+
+                if (cachedCard == null)
                 {
                     result.Status = "Declined";
                     result.DeclineReason = "Geçersiz Kart";
                     return result;
                 }
 
+                if (cachedCard.IsBlocked)
+                {
+                    result.Status = "Declined";
+                    result.DeclineReason = "Kart Blokeli";
+                    return result;
+                }
+
+                if (cachedCard.CVV != input.CVV)
+                {
+                    result.Status = "Declined";
+                    result.DeclineReason = "Hatalı CVV";
+                    return result;
+                }
+
+                var creditCard = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                var debitCard = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
                 bool isCredit = creditCard != null;
                 int cardId = isCredit ? creditCard.CardId : debitCard.CardId;
                 bool isBlocked = isCredit ? creditCard.IsBlocked : debitCard.IsBlocked;
@@ -262,6 +310,8 @@ namespace FraudGuard.Domain.Services
                             debitCard.Balance += processedAmount;
                             await _debitCardRepository.UpdateAsync(debitCard);
                         }
+                        await _cacheProvider.RemoveAsync(cacheKey);
+                        await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
 
                         var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
                         triggeredRuleCode = evaluationResult.RuleCode;
@@ -311,6 +361,8 @@ namespace FraudGuard.Domain.Services
                             debitCard.Balance += processedAmount;
                             await _debitCardRepository.UpdateAsync(debitCard);
                         }
+                        await _cacheProvider.RemoveAsync(cacheKey);
+                        await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
 
                         var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
                         triggeredRuleCode = evaluationResult.RuleCode;
@@ -391,6 +443,7 @@ namespace FraudGuard.Domain.Services
                 }
 
 
+
                 var newTransaction = new ETransaction
                 {
                     CreditCardId = isCredit ? cardId : null,
@@ -422,6 +475,8 @@ namespace FraudGuard.Domain.Services
                 }
                 
                 await _unitOfWork.SaveChangesAsync();
+                await _cacheProvider.RemoveAsync(cacheKey);
+                await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
 
                 if (isSuspicious && triggeredRuleCode != null)
                 {

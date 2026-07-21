@@ -14,19 +14,22 @@ namespace FraudGuard.Domain.Services
         private readonly IDebitCardRepository _debitCardRepository;
         private readonly ICurrencyService _currencyService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICacheProvider _cacheProvider;
 
         public AdminOperationService(
             IFraudLogRepository fraudLogRepository,
             ICreditCardRepository creditCardRepository,
             IDebitCardRepository debitCardRepository,
             ICurrencyService currencyService,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ICacheProvider cacheProvider)
         {
             _fraudLogRepository = fraudLogRepository;
             _creditCardRepository = creditCardRepository;
             _debitCardRepository = debitCardRepository;
             _currencyService = currencyService;
             _unitOfWork = unitOfWork;
+            _cacheProvider = cacheProvider;
         }
 
         public async Task<List<EFraudLog>> GetUnresolvedLogsAsync()
@@ -134,6 +137,27 @@ public async Task<bool> ResolveFraudLogAsync(
 
         await _fraudLogRepository.UpdateAsync(log);
         await _unitOfWork.SaveChangesAsync();
+
+        if (log.Transaction != null)
+        {
+            if (log.Transaction.CreditCard != null)
+            {
+                await _cacheProvider.RemoveAsync($"card_info_{log.Transaction.CreditCard.CardNumber}");
+            }
+            if (log.Transaction.DebitCard != null)
+            {
+                await _cacheProvider.RemoveAsync($"card_info_{log.Transaction.DebitCard.CardNumber}");
+            }
+            if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.ReceiverIBAN))
+            {
+                var receiverDebit = await _debitCardRepository.GetByIBANAsync(log.Transaction.ReceiverIBAN);
+                if (receiverDebit != null)
+                {
+                    await _cacheProvider.RemoveAsync($"card_info_{receiverDebit.CardNumber}");
+                }
+            }
+        }
+
         return true;
 }
     }

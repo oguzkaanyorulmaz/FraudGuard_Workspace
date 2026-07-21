@@ -25,9 +25,18 @@ services:
     environment:
       # Veritabanı adı FraudGuard ve şifre FraudGuard2026_! olarak güncellendi
       - ConnectionStrings__DefaultConnection=Server=db;Database=FraudGuard;User Id=sa;Password=FraudGuard2026_!;TrustServerCertificate=True;
+      - ConnectionStrings__RedisConnection=redis:6379
       - ASPNETCORE_ENVIRONMENT=Development
     depends_on:
       - db
+      - redis
+
+  # 2.5. Redis Önbellek Servisi
+  redis:
+    image: redis:alpine
+    container_name: fraudguard-redis
+    ports:
+      - "6379:6379"
 
   # 3. React Frontend Servisi
   frontend:

@@ -2,6 +2,7 @@ using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Repositories;
+using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Domain.Interfaces.Rules;
 using System;
 using System.Linq;
@@ -18,6 +19,7 @@ namespace FraudGuard.Domain.Services
         private readonly IFraudRuleRepository _fraudRuleRepository;
         private readonly IFraudLogRepository _fraudLogRepository;
         private readonly IEnumerable<IFraudRule> _rules;
+        private readonly ICacheProvider _cacheProvider;
 
         public FraudEvaluationService(
             ITransactionRepository transactionRepository,
@@ -25,7 +27,8 @@ namespace FraudGuard.Domain.Services
             IDebitCardRepository debitCardRepository,
             IFraudRuleRepository fraudRuleRepository,
             IFraudLogRepository fraudLogRepository,
-            IEnumerable<IFraudRule> rules)
+            IEnumerable<IFraudRule> rules,
+            ICacheProvider cacheProvider)
         {
             _transactionRepository = transactionRepository;
             _creditCardRepository = creditCardRepository;
@@ -33,6 +36,7 @@ namespace FraudGuard.Domain.Services
             _fraudRuleRepository = fraudRuleRepository;
             _fraudLogRepository = fraudLogRepository;
             _rules = rules;
+            _cacheProvider = cacheProvider;
         }
 
         public async Task<(string? RuleCode, string? FraudReason)> EvaluateAsync(ProcessTransactionInput input, int cardId)
@@ -42,21 +46,48 @@ namespace FraudGuard.Domain.Services
 
         public async Task<(string? RuleCode, string? FraudReason)> EvaluateAllRulesAsync(ProcessTransactionInput input)
         {
-            List<ETransaction> recentTransactions = new();
-            if (!string.IsNullOrEmpty(input.CardNumber))
+            List<ETransaction> recentTransactions = null!;
+            string cacheKey = !string.IsNullOrEmpty(input.CardNumber) 
+                ? $"recent_txs_{input.CardNumber}" 
+                : (!string.IsNullOrEmpty(input.SenderIBAN) ? $"recent_txs_{input.SenderIBAN}" : string.Empty);
+
+            if (!string.IsNullOrEmpty(cacheKey))
             {
-                var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
-                if (cc != null) recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(cc.CardId, TimeSpan.FromHours(24));
-                else
-                {
-                    var dc = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
-                    if (dc != null) recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, TimeSpan.FromHours(24));
-                }
+                recentTransactions = await _cacheProvider.GetAsync<List<ETransaction>>(cacheKey);
             }
-            else if (!string.IsNullOrEmpty(input.SenderIBAN))
+
+            if (recentTransactions == null)
             {
-                var dc = await _debitCardRepository.GetByIBANAsync(input.SenderIBAN);
-                if (dc != null) recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, TimeSpan.FromHours(24));
+                recentTransactions = new List<ETransaction>();
+                if (!string.IsNullOrEmpty(input.CardNumber))
+                {
+                    var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                    if (cc != null)
+                    {
+                        recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(cc.CardId, TimeSpan.FromHours(24));
+                    }
+                    else
+                    {
+                        var dc = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
+                        if (dc != null)
+                        {
+                            recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, TimeSpan.FromHours(24));
+                        }
+                    }
+                }
+                else if (!string.IsNullOrEmpty(input.SenderIBAN))
+                {
+                    var dc = await _debitCardRepository.GetByIBANAsync(input.SenderIBAN);
+                    if (dc != null)
+                    {
+                        recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, TimeSpan.FromHours(24));
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(cacheKey) && recentTransactions.Count > 0)
+                {
+                    await _cacheProvider.SetAsync(cacheKey, recentTransactions, TimeSpan.FromMinutes(5));
+                }
             }
 
             var activeRules = await _fraudRuleRepository.GetAllActiveRulesAsync();

@@ -28,14 +28,13 @@ namespace FraudGuard.Infrastructure
             services.AddScoped<IFraudLogRepository, FraudLogRepository>();
             services.AddScoped<IBlockReasonRepository, BlockReasonRepository>();
 
-            // 4. Cache Kaydı (Şimdilik lokal geliştirme için MemoryCache kullanıyoruz)
-            services.AddMemoryCache();
-            services.AddSingleton<ICacheProvider, MemoryCacheProvider>();
-            
-            /* İleride Canlıya çıkarken üstteki 2 satırı silip şunları açman yeterli olacak:
-            services.AddStackExchangeRedisCache(options => options.Configuration = configuration.GetConnectionString("RedisConnection"));
-            services.AddSingleton<ICacheProvider, RedisCacheProvider>();
-            */
+            // 4. Cache Kaydı (MemoryCache yerine Redis'e geçiş)
+// services.AddMemoryCache();
+// services.AddSingleton<ICacheProvider, MemoryCacheProvider>();
+
+services.AddStackExchangeRedisCache(options => options.Configuration = configuration.GetConnectionString("RedisConnection"));
+services.AddSingleton<ICacheProvider, RedisCacheProvider>();
+
 
             return services;
         }
