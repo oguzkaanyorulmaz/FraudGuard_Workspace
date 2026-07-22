@@ -18,8 +18,7 @@ namespace FraudGuard.API.Extensions
             services.AddScoped<IFraudRule, MaxOutAttemptRule>();
             services.AddScoped<IFraudRule, CurrencyMismatchRule>();
             services.AddScoped<IFraudRule, ConsecutiveRefundsRule>();
-            services.AddScoped<IFraudRule, LateVoidRule>();
-            services.AddScoped<IFraudRule, HighValueRefundVoidRule>();
+            services.AddScoped<IFraudRule, HighValueRefundRule>();
             services.AddScoped<IFraudRule, SmurfingRule>();
             services.AddScoped<IFraudRule, WalletCashoutRule>();
             services.AddScoped<IFraudRule, MultiSourceFundingRule>();

@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
@@ -14,7 +15,7 @@ namespace FraudGuard.Domain.Services.Rules
         public string RuleCode => "CONSECUTIVE_REFUNDS";
         public string RuleName => "Ardışık İade Kuralı (Consecutive Refunds)";
 
-        public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
+        public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ITransaction> history)
         {
             if (input.PaymentType == PaymentTypeEnum.CreditCard || input.PaymentType == PaymentTypeEnum.DebitCard)
             {
@@ -22,7 +23,7 @@ namespace FraudGuard.Domain.Services.Rules
                 {
                     // Count refunds in the last 24 hours
                     int refundCount = history
-                        .Count(t => t.Status == "Refund" && t.RefundTime.HasValue && t.RefundTime.Value >= DateTime.Now.AddDays(-1));
+                        .Count(t => t.TransactionTypeId == 2 && (t.Status == "Approved" || t.Status == "Refund") && t.TransactionDate >= DateTime.Now.AddDays(-1));
 
                     if (refundCount >= 2)
                     {

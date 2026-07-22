@@ -8,6 +8,8 @@ namespace FraudGuard.Domain.Entities
         public string ChannelCode { get; set; }
         public string Description { get; set; }
 
-        public virtual ICollection<ETransaction> Transactions { get; set; }
+        public virtual ICollection<ECreditCardTransaction> CreditCardTransactions { get; set; }
+        public virtual ICollection<EDebitCardTransaction> DebitCardTransactions { get; set; }
+        public virtual ICollection<ETransferTransaction> TransferTransactions { get; set; }
     }
 }

@@ -25,25 +25,26 @@ const transferSubmitBtn = document.getElementById('transferSubmitBtn');
 
 // ─── State ───
 let history = [];
+let historyFilter = 'all';
 
 // ─── Tab Switching ───
 tabCard.addEventListener('click', () => switchTab('card'));
 tabTransfer.addEventListener('click', () => switchTab('transfer'));
 
-// ─── Transaction Type Change Handler (Show/Hide Original Transaction ID) ───
+// --- Transaction Type Change Handler (Show/Hide RRN for Refund) ---
 const transactionTypeSelect = document.getElementById('transactionType');
-const originalTransactionGroup = document.getElementById('originalTransactionGroup');
-const originalTransactionIdInput = document.getElementById('originalTransactionId');
+const rrnGroup = document.getElementById('rrnGroup');
+const rrnInput = document.getElementById('rrnInput');
 
 transactionTypeSelect.addEventListener('change', () => {
     const val = parseInt(transactionTypeSelect.value, 10);
-    if (val === 2 || val === 3) {
-        originalTransactionGroup.style.display = 'block';
-        originalTransactionIdInput.required = true;
+    if (val === 2) {
+        rrnGroup.style.display = 'block';
+        rrnInput.required = true;
     } else {
-        originalTransactionGroup.style.display = 'none';
-        originalTransactionIdInput.required = false;
-        originalTransactionIdInput.value = '';
+        rrnGroup.style.display = 'none';
+        rrnInput.required = false;
+        rrnInput.value = '';
     }
 });
 
@@ -110,7 +111,7 @@ cardForm.addEventListener('submit', async (e) => {
         location: document.getElementById('cardLocation').value || 'Sanal POS',
         country: document.getElementById('cardCountry').value || 'Türkiye',
         merchantCategory: document.getElementById('merchantCategory').value,
-        originalTransactionId: originalTransactionIdInput.value ? parseInt(originalTransactionIdInput.value, 10) : null
+        rrn: rrnInput.value || null
     };
 
     await sendRequest(`${API_BASE}/process`, payload, 'card', cardSubmitBtn);
@@ -220,8 +221,12 @@ function showResponse(data, isOk, type) {
         html += renderItem('Mesaj', data.message, true);
     }
 
+    if (data.rrn) {
+        html += renderItem('RRN (Referans No)', data.rrn);
+    }
+
     // Show raw JSON for extra info
-    const knownKeys = ['status', 'transactionId', 'amount', 'currency', 'remainingBalance', 'declineReason', 'fraudReason', 'message'];
+    const knownKeys = ['status', 'transactionId', 'amount', 'currency', 'remainingBalance', 'declineReason', 'fraudReason', 'message', 'isSuccess', 'rrn'];
     const extra = Object.entries(data).filter(([k]) => !knownKeys.includes(k));
     if (extra.length > 0) {
         extra.forEach(([key, value]) => {
@@ -309,48 +314,138 @@ function addHistory(data, type, payload) {
     }
 
     const entry = {
+        id: Date.now(),
         type,
         status: normalizedStatus,
         statusText: displayStatus,
         amount: payload.amount,
         currency: payload.currency || 'TRY',
         meta,
-        time: new Date()
+        time: new Date(),
+        payload,
+        responseData: data
     };
 
     history.unshift(entry);
-    if (history.length > 20) history.pop();
+    if (history.length > 50) history.pop();
+    renderHistory();
+}
+
+function setHistoryFilter(filter) {
+    historyFilter = filter;
+    // Update active button
+    document.querySelectorAll('.history-filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
     renderHistory();
 }
 
 function renderHistory() {
-    if (history.length === 0) {
-        historyList.innerHTML = '<div class="empty-history">Henüz işlem geçmişi yok</div>';
+    let filtered = history;
+    if (historyFilter === 'suspicious') {
+        filtered = history.filter(item => item.status === 'suspicious');
+    }
+    const display = filtered.slice(0, 10);
+
+    if (display.length === 0) {
+        const emptyMsg = historyFilter === 'suspicious'
+            ? 'Henüz şüpheli işlem yok'
+            : 'Henüz işlem geçmişi yok';
+        historyList.innerHTML = `<div class="empty-history">${emptyMsg}</div>`;
         return;
     }
 
-    historyList.innerHTML = history.map((item) => {
+    historyList.innerHTML = display.map((item) => {
         const statusClass = item.status === 'approved' ? 'approved'
             : item.status === 'suspicious' ? 'suspicious'
                 : 'declined';
         const timeStr = item.time.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
+        // Build detail rows
+        let detailRows = '';
+        const p = item.payload || {};
+        const r = item.responseData || {};
+
+        if (item.type === 'card') {
+            if (p.cardNumber) detailRows += historyDetailRow('Kart No', maskCard(p.cardNumber));
+            if (p.expiryDate) detailRows += historyDetailRow('Son Kullanma', p.expiryDate);
+            if (p.transactionType) detailRows += historyDetailRow('İşlem Tipi', p.transactionType === 1 ? 'Satış' : 'İade');
+            if (p.paymentType) detailRows += historyDetailRow('Ödeme Tipi', p.paymentType === 1 ? 'Kredi Kartı' : 'Banka Kartı');
+            if (p.channelTypeId) detailRows += historyDetailRow('Kanal', getChannelName(p.channelTypeId));
+            if (p.merchantCategory) detailRows += historyDetailRow('Kategori', p.merchantCategory);
+            if (p.location) detailRows += historyDetailRow('Lokasyon', p.location);
+            if (p.rrn) detailRows += historyDetailRow('RRN (Gönderilen)', p.rrn);
+        } else {
+            if (p.senderIBAN) detailRows += historyDetailRow('Gönderici IBAN', maskIban(p.senderIBAN));
+            if (p.receiverIBAN) detailRows += historyDetailRow('Alıcı IBAN', maskIban(p.receiverIBAN));
+            if (p.receiverName) detailRows += historyDetailRow('Alıcı Adı', p.receiverName);
+            if (p.description) detailRows += historyDetailRow('Açıklama', p.description);
+            if (p.location) detailRows += historyDetailRow('Lokasyon', p.location);
+        }
+
+        // Response fields
+        if (r.transactionId) detailRows += historyDetailRow('İşlem ID', r.transactionId);
+        if (r.rrn) detailRows += historyDetailRow('RRN', r.rrn);
+        if (r.declineReason) detailRows += historyDetailRow('Red Sebebi', r.declineReason);
+        if (r.fraudReason) detailRows += historyDetailRow('Fraud Nedeni', r.fraudReason);
+        if (r.message) detailRows += historyDetailRow('Mesaj', r.message);
+
         return `
-            <div class="history-item">
-                <div class="history-left">
-                    <span class="history-type-badge ${item.type}">${item.type === 'card' ? 'KART' : 'EFT'}</span>
-                    <div class="history-info">
-                        <span class="history-amount">${formatAmount(item.amount)} ${item.currency}</span>
-                        <span class="history-meta">${item.meta}</span>
+            <div class="history-item-wrapper" data-history-id="${item.id}">
+                <div class="history-item" onclick="toggleHistoryDetail(${item.id})">
+                    <div class="history-left">
+                        <span class="history-type-badge ${item.type}">${item.type === 'card' ? 'KART' : 'EFT'}</span>
+                        <div class="history-info">
+                            <span class="history-amount">${formatAmount(item.amount)} ${item.currency}</span>
+                            <span class="history-meta">${item.meta}</span>
+                        </div>
+                    </div>
+                    <div class="history-right">
+                        <span class="history-status ${statusClass}">${item.statusText}</span>
+                        <span class="history-time">${timeStr}</span>
+                        <span class="history-chevron">‹</span>
                     </div>
                 </div>
-                <div class="history-right">
-                    <span class="history-status ${statusClass}">${item.statusText}</span>
-                    <span class="history-time">${timeStr}</span>
+                <div class="history-detail">
+                    <div class="history-detail-grid">
+                        ${detailRows}
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+function historyDetailRow(label, value) {
+    return `
+        <div class="history-detail-item">
+            <span class="history-detail-label">${label}</span>
+            <span class="history-detail-value">${value}</span>
+        </div>
+    `;
+}
+
+function maskCard(num) {
+    const clean = (num || '').replace(/\s/g, '');
+    if (clean.length < 8) return clean;
+    return clean.slice(0, 4) + ' •••• •••• ' + clean.slice(-4);
+}
+
+function maskIban(iban) {
+    if (!iban || iban.length < 10) return iban;
+    return iban.slice(0, 6) + '••••••••••' + iban.slice(-4);
+}
+
+function getChannelName(id) {
+    const map = { 1: 'Fiziksel POS', 2: 'Sanal POS', 3: 'ATM', 4: 'Mobil Şube', 5: 'İnternet Şubesi' };
+    return map[id] || id;
+}
+
+function toggleHistoryDetail(id) {
+    const wrapper = document.querySelector(`[data-history-id="${id}"]`);
+    if (wrapper) {
+        wrapper.classList.toggle('expanded');
+    }
 }
 
 clearHistory.addEventListener('click', () => {

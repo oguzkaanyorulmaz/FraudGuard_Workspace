@@ -13,7 +13,9 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
 
         public DbSet<ECustomer> Customers { get; set; }
         public DbSet<ECreditCard> CreditCards { get; set; }
-        public DbSet<ETransaction> Transactions { get; set; }
+        public DbSet<ECreditCardTransaction> CreditCardTransactions { get; set; }
+public DbSet<EDebitCardTransaction> DebitCardTransactions { get; set; }
+public DbSet<ETransferTransaction> TransferTransactions { get; set; }
         public DbSet<EDebitCard> DebitCards { get; set; }
         public DbSet<EChannelType> ChannelTypes { get; set; }
         public DbSet<EBankAccountBeneficiary> BankAccountBeneficiaries { get; set; }
@@ -34,11 +36,10 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
 
             // 1. Transaction Types Seeding
             modelBuilder.Entity<ETransactionType>().HasData(
-                new ETransactionType { TransactionTypeId = 1, TypeCode = "Sale", Description = "Satış İşlemi" },
-                new ETransactionType { TransactionTypeId = 2, TypeCode = "Refund", Description = "İade İşlemi" },
-                new ETransactionType { TransactionTypeId = 3, TypeCode = "Void", Description = "İptal İşlemi" },
-                new ETransactionType { TransactionTypeId = 4, TypeCode = "Transfer", Description = "Para Gönderimi" }
-            );
+    new ETransactionType { TransactionTypeId = 1, TypeCode = "Sale", Description = "Satış İşlemi" },
+    new ETransactionType { TransactionTypeId = 2, TypeCode = "Refund", Description = "İade İşlemi" }
+);
+
 
             // 2. Fraud Rules Seeding
             modelBuilder.Entity<EFraudRule>().HasData(
@@ -152,17 +153,17 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Role = UserRoleEnum.Analyst }
             );
 
-            // 10. Transactions Seeding (For history-based rules setup)
+            // 10. Mock Data Seeding (Tüm eski ETransaction verilerinin 3 yeni tabloya bölünmüş ve RRN atanmış hali)
             var baseTime = new DateTime(2026, 7, 17, 10, 0, 0);
-            modelBuilder.Entity<ETransaction>().HasData(
-                // For Card 9 (Musteri 9) - Prior foreign transaction to allow Currency Mismatch without Cross Border
-                new ETransaction
+
+            // Kredi Kartı Simülasyon Verileri
+            modelBuilder.Entity<ECreditCardTransaction>().HasData(
+                new ECreditCardTransaction
                 {
                     TransactionId = 1,
+                    RRN = "100000000001",
                     CreditCardId = 9,
-                    DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "EUR",
                     Amount = 100,
@@ -172,131 +173,12 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     MerchantCategory = "Giyim",
                     Status = "Approved"
                 },
-                // For Card 12 (Musteri 12) - Prior virtual POS load to trigger Wallet Cash-out
-                new ETransaction
-                {
-                    TransactionId = 2,
-                    CreditCardId = null,
-                    DebitCardId = 12,
-                    SenderIBAN = null,
-                    ReceiverIBAN = "TR110006200000000001000012",
-                    ReceiverName = "Musteri12",
-                    TransactionTypeId = 1, // Sale (Load)
-                    PaymentType = PaymentTypeEnum.CreditCard,
-                    ChannelTypeId = 2, // VirtualPOS
-                    Currency = "TRY",
-                    Amount = 10000,
-                    TransactionDate = baseTime.AddMinutes(-5),
-                    Location = "Bakiye Yukleme",
-                    Country = "Türkiye",
-                    MerchantCategory = "Finans",
-                    Status = "Approved"
-                },
-                // For Card 13 (Musteri 13) - Prior deposits from 2 different senders to trigger Multi-Source Funding
-                new ETransaction
-                {
-                    TransactionId = 3,
-                    CreditCardId = null,
-                    DebitCardId = 13,
-                    SenderIBAN = "TR110006200000000001000002",
-                    ReceiverIBAN = "TR110006200000000001000013",
-                    ReceiverName = "Musteri13",
-                    TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentType = PaymentTypeEnum.EFT,
-                    ChannelTypeId = 4, // Mobile
-                    Currency = "TRY",
-                    Amount = 5000,
-                    TransactionDate = baseTime.AddMinutes(-10),
-                    Location = "Mobil Bankacilik",
-                    Country = "Türkiye",
-                    MerchantCategory = "Para Transferi",
-                    Status = "Approved"
-                },
-                new ETransaction
-                {
-                    TransactionId = 4,
-                    CreditCardId = null,
-                    DebitCardId = 13,
-                    SenderIBAN = "TR110006200000000001000003",
-                    ReceiverIBAN = "TR110006200000000001000013",
-                    ReceiverName = "Musteri13",
-                    TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentType = PaymentTypeEnum.EFT,
-                    ChannelTypeId = 4, // Mobile
-                    Currency = "TRY",
-                    Amount = 5000,
-                    TransactionDate = baseTime.AddMinutes(-8),
-                    Location = "Mobil Bankacilik",
-                    Country = "Türkiye",
-                    MerchantCategory = "Para Transferi",
-                    Status = "Approved"
-                },
-                // For Card 19 (Musteri 19) - Prior deposits from 3 different senders to trigger Multi-Sender
-                new ETransaction
-                {
-                    TransactionId = 5,
-                    CreditCardId = null,
-                    DebitCardId = 19,
-                    SenderIBAN = "TR110006200000000001000002",
-                    ReceiverIBAN = "TR110006200000000001000019",
-                    ReceiverName = "Musteri19",
-                    TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentType = PaymentTypeEnum.EFT,
-                    ChannelTypeId = 4, // Mobile
-                    Currency = "TRY",
-                    Amount = 1000,
-                    TransactionDate = baseTime.AddMinutes(-15),
-                    Location = "Mobil Bankacilik",
-                    Country = "Türkiye",
-                    MerchantCategory = "Para Transferi",
-                    Status = "Approved"
-                },
-                new ETransaction
-                {
-                    TransactionId = 6,
-                    CreditCardId = null,
-                    DebitCardId = 19,
-                    SenderIBAN = "TR110006200000000001000003",
-                    ReceiverIBAN = "TR110006200000000001000019",
-                    ReceiverName = "Musteri19",
-                    TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentType = PaymentTypeEnum.EFT,
-                    ChannelTypeId = 4, // Mobile
-                    Currency = "TRY",
-                    Amount = 1000,
-                    TransactionDate = baseTime.AddMinutes(-12),
-                    Location = "Mobil Bankacilik",
-                    Country = "Türkiye",
-                    MerchantCategory = "Para Transferi",
-                    Status = "Approved"
-                },
-                new ETransaction
-                {
-                    TransactionId = 7,
-                    CreditCardId = null,
-                    DebitCardId = 19,
-                    SenderIBAN = "TR110006200000000001000004",
-                    ReceiverIBAN = "TR110006200000000001000019",
-                    ReceiverName = "Musteri19",
-                    TransactionTypeId = 4, // Transfer (Para Gönderimi)
-                    PaymentType = PaymentTypeEnum.EFT,
-                    ChannelTypeId = 4, // Mobile
-                    Currency = "TRY",
-                    Amount = 1000,
-                    TransactionDate = baseTime.AddMinutes(-10),
-                    Location = "Mobil Bankacilik",
-                    Country = "Türkiye",
-                    MerchantCategory = "Para Transferi",
-                    Status = "Approved"
-                },
-                // For Card 10 (Musteri 10) - Prior approved sale transactions so they can issue consecutive refunds
-                new ETransaction
+                new ECreditCardTransaction
                 {
                     TransactionId = 8,
+                    RRN = "100000000008",
                     CreditCardId = 10,
-                    DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -306,13 +188,12 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     MerchantCategory = "Giyim",
                     Status = "Approved"
                 },
-                new ETransaction
+                new ECreditCardTransaction
                 {
                     TransactionId = 9,
+                    RRN = "100000000009",
                     CreditCardId = 10,
-                    DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -322,13 +203,12 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     MerchantCategory = "Giyim",
                     Status = "Approved"
                 },
-                new ETransaction
+                new ECreditCardTransaction
                 {
                     TransactionId = 10,
+                    RRN = "100000000010",
                     CreditCardId = 10,
-                    DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -338,13 +218,12 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     MerchantCategory = "Giyim",
                     Status = "Approved"
                 },
-                new ETransaction
+                new ECreditCardTransaction
                 {
                     TransactionId = 11,
+                    RRN = "100000000011",
                     CreditCardId = 10,
-                    DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -354,13 +233,12 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     MerchantCategory = "Giyim",
                     Status = "Approved"
                 },
-                new ETransaction
+                new ECreditCardTransaction
                 {
                     TransactionId = 12,
+                    RRN = "100000000012",
                     CreditCardId = 10,
-                    DebitCardId = null,
                     TransactionTypeId = 1, // Sale
-                    PaymentType = PaymentTypeEnum.CreditCard,
                     ChannelTypeId = 2, // VirtualPOS
                     Currency = "TRY",
                     Amount = 100,
@@ -368,6 +246,104 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Sanal POS",
                     Country = "Türkiye",
                     MerchantCategory = "Giyim",
+                    Status = "Approved"
+                }
+            );
+
+            // Banka Kartı Simülasyon Verileri
+            modelBuilder.Entity<EDebitCardTransaction>().HasData(
+                new EDebitCardTransaction
+                {
+                    TransactionId = 2,
+                    RRN = "200000000002",
+                    DebitCardId = 12,
+                    TransactionTypeId = 1, // Sale
+                    ChannelTypeId = 2, // VirtualPOS
+                    Currency = "TRY",
+                    Amount = 10000,
+                    TransactionDate = baseTime.AddMinutes(-5),
+                    Location = "Bakiye Yukleme",
+                    Country = "Türkiye",
+                    MerchantCategory = "Finans",
+                    Status = "Approved"
+                }
+            );
+
+            // Transfer Simülasyon Verileri
+            modelBuilder.Entity<ETransferTransaction>().HasData(
+                new ETransferTransaction
+                {
+                    TransactionId = 3,
+                    RRN = "300000000003",
+                    SenderIBAN = "TR110006200000000001000002",
+                    ReceiverIBAN = "TR110006200000000001000013",
+                    ReceiverName = "Musteri13",
+                    ChannelTypeId = 4, // Mobile
+                    Currency = "TRY",
+                    Amount = 5000,
+                    TransactionDate = baseTime.AddMinutes(-10),
+                    Location = "Mobil Bankacilik",
+                    Country = "Türkiye",
+                    Status = "Approved"
+                },
+                new ETransferTransaction
+                {
+                    TransactionId = 4,
+                    RRN = "300000000004",
+                    SenderIBAN = "TR110006200000000001000003",
+                    ReceiverIBAN = "TR110006200000000001000013",
+                    ReceiverName = "Musteri13",
+                    ChannelTypeId = 4, // Mobile
+                    Currency = "TRY",
+                    Amount = 5000,
+                    TransactionDate = baseTime.AddMinutes(-8),
+                    Location = "Mobil Bankacilik",
+                    Country = "Türkiye",
+                    Status = "Approved"
+                },
+                new ETransferTransaction
+                {
+                    TransactionId = 5,
+                    RRN = "300000000005",
+                    SenderIBAN = "TR110006200000000001000002",
+                    ReceiverIBAN = "TR110006200000000001000019",
+                    ReceiverName = "Musteri19",
+                    ChannelTypeId = 4, // Mobile
+                    Currency = "TRY",
+                    Amount = 1000,
+                    TransactionDate = baseTime.AddMinutes(-15),
+                    Location = "Mobil Bankacilik",
+                    Country = "Türkiye",
+                    Status = "Approved"
+                },
+                new ETransferTransaction
+                {
+                    TransactionId = 6,
+                    RRN = "300000000006",
+                    SenderIBAN = "TR110006200000000001000003",
+                    ReceiverIBAN = "TR110006200000000001000019",
+                    ReceiverName = "Musteri19",
+                    ChannelTypeId = 4, // Mobile
+                    Currency = "TRY",
+                    Amount = 1000,
+                    TransactionDate = baseTime.AddMinutes(-12),
+                    Location = "Mobil Bankacilik",
+                    Country = "Türkiye",
+                    Status = "Approved"
+                },
+                new ETransferTransaction
+                {
+                    TransactionId = 7,
+                    RRN = "300000000007",
+                    SenderIBAN = "TR110006200000000001000004",
+                    ReceiverIBAN = "TR110006200000000001000019",
+                    ReceiverName = "Musteri19",
+                    ChannelTypeId = 4, // Mobile
+                    Currency = "TRY",
+                    Amount = 1000,
+                    TransactionDate = baseTime.AddMinutes(-10),
+                    Location = "Mobil Bankacilik",
+                    Country = "Türkiye",
                     Status = "Approved"
                 }
             );

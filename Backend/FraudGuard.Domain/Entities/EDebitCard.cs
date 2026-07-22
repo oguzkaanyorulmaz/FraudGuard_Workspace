@@ -16,6 +16,6 @@ namespace FraudGuard.Domain.Entities
 
         public virtual ECustomer Customer { get; set; }
         public virtual EBlockReason? BlockReason { get; set; }
-        public virtual ICollection<ETransaction> Transactions { get; set; }
+        public virtual ICollection<EDebitCardTransaction> Transactions { get; set; }
     }
 }

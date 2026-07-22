@@ -22,11 +22,13 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public decimal CardLimit { get; set; }
         public decimal AvailableLimit { get; set; }
         public bool IsCardBlocked { get; set; }
+        public bool IsCardSuspicious { get; set; }
 
         public string CustomerFullName { get; set; }
         public string IdentityNumber { get; set; }
         public string? PhoneNumber { get; set; }
         public List<CardRecentTransactionDto> RecentTransactions { get; set; } = new();
+        public List<CardRecentTransactionDto> RecentSuspiciousTransactions { get; set; } = new();
         public string? AdminNote { get; set; }
         public string? ResolvedByAdmin { get; set; }
     }
@@ -45,5 +47,6 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public string? AdminNote { get; set; }
         public string? ResolvedByAdmin { get; set; }
         public string? DeclineReason { get; set; }
+        public string? PaymentTypeCode { get; set; }
     }
 }

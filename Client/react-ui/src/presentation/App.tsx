@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Transaction } from '../domain/entities/Transaction';
 import { Header } from './components/layout/Header';
 import { TransactionList } from './components/dashboard/TransactionList';
@@ -10,6 +10,7 @@ import { useSelection } from './hooks/useSelection';
 import { theme } from './styles/theme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/auth/LoginPage';
+import { SearchableSelect } from './components/common/SearchableSelect';
 
 
 /* bg-[#F4F5F7] text-[#1A1D20] selection:bg-[#FFCB05] bg-white border-[#E4E7EB] shadow-sm 
@@ -130,6 +131,7 @@ function Dashboard() {
     const [actionType, setActionType] = useState<'APPROVE' | 'BLOCK' | 'BULK_BLOCK' | 'BULK_APPROVE' | null>(null);
     const [selectedTxnId, setSelectedTxnId] = useState<string | null>(null);
     const [sidebarTxn, setSidebarTxn] = useState<Transaction | null>(null);
+    const [exitingTxnIds, setExitingTxnIds] = useState<string[]>([]);
 
     const openApproveModal = (id: string) => { setSelectedTxnId(id); setActionType('APPROVE'); setIsModalOpen(true); };
     const openBlockModal = (id: string) => { setSelectedTxnId(id); setActionType('BLOCK'); setIsModalOpen(true); };
@@ -137,23 +139,43 @@ function Dashboard() {
     const openBulkApproveModal = () => { setActionType('BULK_APPROVE'); setIsModalOpen(true); };
 
     const handleModalConfirm = (id: string, reason: string, blockReasonId?: number, analystName?: string) => {
-        if (actionType === 'APPROVE') {
-            handleApprove(id, reason, analystName);
-        }
-        else if (actionType === 'BLOCK') {
-            handleBlock(id, reason, blockReasonId, analystName);
-        }
-        else if (actionType === 'BULK_BLOCK') {
-            handleBulkBlock(selectedIds, reason, blockReasonId, analystName);
-            clearSelection();
-        }
-        else if (actionType === 'BULK_APPROVE') {
-            handleBulkApprove(selectedIds, reason, analystName);
-            clearSelection();
-        }
         setIsModalOpen(false);
-        setSelectedTxnId(null);
+        const currentAction = actionType;
         setActionType(null);
+        setSelectedTxnId(null);
+
+        if (currentAction === 'APPROVE') {
+            setExitingTxnIds(prev => [...prev, id]);
+            setTimeout(() => {
+                handleApprove(id, reason, analystName);
+                setExitingTxnIds(prev => prev.filter(x => x !== id));
+            }, 400);
+        }
+        else if (currentAction === 'BLOCK') {
+            setExitingTxnIds(prev => [...prev, id]);
+            setTimeout(() => {
+                handleBlock(id, reason, blockReasonId, analystName);
+                setExitingTxnIds(prev => prev.filter(x => x !== id));
+            }, 400);
+        }
+        else if (currentAction === 'BULK_BLOCK') {
+            const targets = [...selectedIds];
+            setExitingTxnIds(prev => [...prev, ...targets]);
+            setTimeout(() => {
+                handleBulkBlock(targets, reason, blockReasonId, analystName);
+                clearSelection();
+                setExitingTxnIds(prev => prev.filter(x => !targets.includes(x)));
+            }, 400);
+        }
+        else if (currentAction === 'BULK_APPROVE') {
+            const targets = [...selectedIds];
+            setExitingTxnIds(prev => [...prev, ...targets]);
+            setTimeout(() => {
+                handleBulkApprove(targets, reason, analystName);
+                clearSelection();
+                setExitingTxnIds(prev => prev.filter(x => !targets.includes(x)));
+            }, 400);
+        }
     };
 
     const toggleTab = (tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
@@ -262,17 +284,42 @@ function Dashboard() {
     };
 
 
-    const filteredData = getFilteredData();
+    const [visibleItems, setVisibleItems] = useState<{ transaction: Transaction; historyAction?: 'APPROVED' | 'BLOCKED' }[]>([]);
+
+    useEffect(() => {
+        const nextData = getFilteredData();
+        const nextIds = new Set(nextData.map(item => item.transaction.id));
+        const exiting = visibleItems.filter(item => !nextIds.has(item.transaction.id));
+
+        if (exiting.length > 0 && visibleItems.length > 0) {
+            const exitingIds = exiting.map(item => item.transaction.id);
+            setExitingTxnIds(prev => [...new Set([...prev, ...exitingIds])]);
+            const timer = setTimeout(() => {
+                setVisibleItems(nextData);
+                setExitingTxnIds(prev => prev.filter(id => !exitingIds.includes(id)));
+            }, 400);
+            return () => clearTimeout(timer);
+        } else {
+            setVisibleItems(nextData);
+        }
+    }, [transactions, history, selectedTabs, searchTerm, selectedScenario, selectedPaymentType, sortFields]);
 
     const isPendingActive = selectedTabs.length === 1 && selectedTabs.includes('PENDING');
     const isBlockedActive = selectedTabs.length === 1 && selectedTabs.includes('BLOCKED');
     const isApprovedActive = selectedTabs.length === 1 && selectedTabs.includes('APPROVED');
 
+    const getEmptyMessage = () => {
+        if (isPendingActive) return "Şüpheli İşlem Bulunmamaktadır.";
+        if (isBlockedActive) return "Blokelenen İşlem Bulunmamaktadır.";
+        if (isApprovedActive) return "Onaylanan İşlem Bulunmamaktadır.";
+        return "Kayıt Bulunmamaktadır.";
+    };
+
     return (
         <div className={theme.styles.body}>
-            {/* Maksimum genişlik, ortalama (mx-auto) ve konforlu dolgu (px ve py) eklenmiştir */}
-            <div className="max-w-7xl mx-auto w-full px-4 py-6 md:px-8 flex-1 transition-all duration-300">
-                <Header />
+            <Header />
+            {/* Full-width container to occupy the entire screen */}
+            <div className="w-full px-4 py-6 md:px-8 flex-1 transition-all duration-300">
 
                 {/* Üst İstatistik Kartları */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
@@ -344,41 +391,69 @@ function Dashboard() {
 
 
                         {/* Gelişmiş Filtreler */}
-                        <div className="flex flex-nowrap items-center gap-2 text-sm overflow-x-auto pb-1 md:pb-0">
+                        <div className="flex flex-wrap md:flex-nowrap items-center gap-2 text-sm overflow-visible pb-1 md:pb-0">
                             {/* Ödeme Tipi Seçimi */}
-                            <select
+                            <SearchableSelect
+                                options={[
+                                    { value: 'ALL', label: '🔍 Tüm Tipler' },
+                                    { value: 'CREDIT_CARD', label: '💳 Kredi Kartı' },
+                                    { value: 'DEBIT_CARD', label: '🏦 Banka Kartı' },
+                                    { value: 'BANK_TRANSFER', label: '💸 EFT / Havale' }
+                                ]}
                                 value={selectedPaymentType}
-                                onChange={(e) => {
-                                    setSelectedPaymentType(e.target.value);
-                                    setSelectedScenario('ALL'); // Ödeme tipi değiştiğinde senaryo filtresini sıfırla
+                                onChange={(val) => {
+                                    setSelectedPaymentType(val);
+                                    setSelectedScenario('ALL');
                                 }}
-                                className={`${theme.styles.select} w-40 md:w-48 text-xs md:text-sm`}
-                            >
-                                <option value="ALL">🔍 Tüm Tipler</option>
-                                <option value="CREDIT_CARD">💳 Kredi Kartı</option>
-                                <option value="DEBIT_CARD">🏦 Banka Kartı</option>
-                                <option value="BANK_TRANSFER">💸 EFT / Havale</option>
-                            </select>
+                                placeholder="🔍 Tüm Tipler"
+                                className="w-40 md:w-48"
+                            />
 
                             {/* Senaryo Seçimi (Dinamik Süzülen) */}
-                            <select
+                            <SearchableSelect
+                                options={[
+                                    { value: 'ALL', label: '📋 Tüm Senaryolar' },
+                                    ...(paymentTypeScenarios[selectedPaymentType] || [])
+                                ]}
                                 value={selectedScenario}
-                                onChange={(e) => setSelectedScenario(e.target.value)}
-                                className={`${theme.styles.select} w-44 md:w-52 text-xs md:text-sm`}
-                            >
-                                <option value="ALL">📋 Tüm Senaryolar</option>
-                                {paymentTypeScenarios[selectedPaymentType]?.map(s => (
-                                    <option key={s.value} value={s.value}>{s.label}</option>
-                                ))}
-                            </select>
-
-                            <input
-                                type="text"
-                                placeholder="🔍 Ara..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className={`${theme.styles.input.replace('w-64', '')} w-32 md:w-44 text-xs md:text-sm`}
+                                onChange={setSelectedScenario}
+                                placeholder="📋 Senaryo Seçiniz"
+                                className="w-44 md:w-52"
                             />
+
+                            <div className="relative flex items-center bg-white border border-[#C5CBD3] rounded-lg px-3 py-1.5 transition-all focus-within:border-[#FDBB30] focus-within:ring-2 focus-within:ring-[#FDBB30]/20 w-44 md:w-64">
+                                <svg 
+                                    className="w-4 h-4 text-slate-500 mr-2 flex-shrink-0" 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Arama"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full bg-transparent border-none outline-none text-xs md:text-sm text-[#1A1D20] placeholder-slate-400 focus:ring-0 p-0 pr-5"
+                                />
+                                {searchTerm && (
+                                    <button 
+                                        type="button"
+                                        onClick={() => setSearchTerm('')}
+                                        className="absolute right-2 text-slate-400 hover:text-slate-700 bg-transparent border-none outline-none cursor-pointer flex items-center justify-center p-0"
+                                    >
+                                        <svg 
+                                            className="w-4 h-4" 
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                     </div>
@@ -387,7 +462,7 @@ function Dashboard() {
                 </div>
 
                 <TransactionList
-                    transactions={filteredData}
+                    transactions={visibleItems}
                     loading={loading}
                     selectedIds={selectedIds}
                     onToggleSelection={toggleSelection}
@@ -397,6 +472,8 @@ function Dashboard() {
                     onViewDetails={setSidebarTxn}
                     sortFields={sortFields}
                     onSort={handleSort}
+                    exitingIds={exitingTxnIds}
+                    emptyMessage={getEmptyMessage()}
                 />
 
             </div>

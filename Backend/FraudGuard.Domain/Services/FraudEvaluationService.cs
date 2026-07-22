@@ -1,9 +1,11 @@
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
+using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Repositories;
 using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Domain.Interfaces.Rules;
+using FraudGuard.Domain.Interfaces.Entities;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -46,32 +48,64 @@ namespace FraudGuard.Domain.Services
 
         public async Task<(string? RuleCode, string? FraudReason)> EvaluateAllRulesAsync(ProcessTransactionInput input)
         {
-            List<ETransaction> recentTransactions = null!;
+            List<ITransaction> recentTransactions = null!;
             string cacheKey = !string.IsNullOrEmpty(input.CardNumber) 
                 ? $"recent_txs_{input.CardNumber}" 
                 : (!string.IsNullOrEmpty(input.SenderIBAN) ? $"recent_txs_{input.SenderIBAN}" : string.Empty);
 
             if (!string.IsNullOrEmpty(cacheKey))
             {
-                recentTransactions = await _cacheProvider.GetAsync<List<ETransaction>>(cacheKey);
-            }
-
-            if (recentTransactions == null)
-            {
-                recentTransactions = new List<ETransaction>();
                 if (!string.IsNullOrEmpty(input.CardNumber))
                 {
                     var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
                     if (cc != null)
                     {
-                        recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(cc.CardId, TimeSpan.FromHours(24));
+                        var ccTxs = await _cacheProvider.GetAsync<List<ECreditCardTransaction>>(cacheKey);
+                        if (ccTxs != null) recentTransactions = ccTxs.Cast<ITransaction>().ToList();
                     }
                     else
                     {
                         var dc = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
                         if (dc != null)
                         {
-                            recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, TimeSpan.FromHours(24));
+                            var dcTxs = await _cacheProvider.GetAsync<List<EDebitCardTransaction>>(cacheKey);
+                            if (dcTxs != null) recentTransactions = dcTxs.Cast<ITransaction>().ToList();
+                        }
+                    }
+                }
+                else if (!string.IsNullOrEmpty(input.SenderIBAN))
+                {
+                    var trans = await _cacheProvider.GetAsync<List<ETransferTransaction>>(cacheKey);
+                    if (trans != null) recentTransactions = trans.Cast<ITransaction>().ToList();
+                }
+            }
+
+            if (recentTransactions == null)
+            {
+                recentTransactions = new List<ITransaction>();
+                if (!string.IsNullOrEmpty(input.CardNumber))
+                {
+                    var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                    if (cc != null)
+                    {
+                        var ccTxs = await _transactionRepository.GetRecentTransactionsAsync(cc.CardId, isCreditCard: true, TimeSpan.FromHours(24));
+                        recentTransactions = ccTxs;
+                        if (!string.IsNullOrEmpty(cacheKey) && ccTxs.Count > 0)
+                        {
+                            await _cacheProvider.SetAsync(cacheKey, ccTxs.Cast<ECreditCardTransaction>().ToList(), TimeSpan.FromMinutes(5));
+                        }
+                    }
+                    else
+                    {
+                        var dc = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
+                        if (dc != null)
+                        {
+                            var dcTxs = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, isCreditCard: false, TimeSpan.FromHours(24));
+                            recentTransactions = dcTxs;
+                            if (!string.IsNullOrEmpty(cacheKey) && dcTxs.Count > 0)
+                            {
+                                await _cacheProvider.SetAsync(cacheKey, dcTxs.Cast<EDebitCardTransaction>().ToList(), TimeSpan.FromMinutes(5));
+                            }
                         }
                     }
                 }
@@ -80,13 +114,13 @@ namespace FraudGuard.Domain.Services
                     var dc = await _debitCardRepository.GetByIBANAsync(input.SenderIBAN);
                     if (dc != null)
                     {
-                        recentTransactions = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, TimeSpan.FromHours(24));
+                        var transTxs = await _transactionRepository.GetRecentTransferTransactionsBySenderIBANAsync(input.SenderIBAN, TimeSpan.FromHours(24));
+                        recentTransactions = transTxs.Cast<ITransaction>().ToList();
+                        if (!string.IsNullOrEmpty(cacheKey) && transTxs.Count > 0)
+                        {
+                            await _cacheProvider.SetAsync(cacheKey, transTxs, TimeSpan.FromMinutes(5));
+                        }
                     }
-                }
-
-                if (!string.IsNullOrEmpty(cacheKey) && recentTransactions.Count > 0)
-                {
-                    await _cacheProvider.SetAsync(cacheKey, recentTransactions, TimeSpan.FromMinutes(5));
                 }
             }
 
@@ -108,18 +142,31 @@ namespace FraudGuard.Domain.Services
             return (null, null);
         }
 
-        public async Task CreateFraudLogAsync(int transactionId, string ruleCode)
+        public async Task CreateFraudLogAsync(int transactionId, string ruleCode, PaymentTypeEnum paymentType)
         {
             var rule = await _fraudRuleRepository.GetByCodeAsync(ruleCode);
             if (rule != null && rule.IsActive)
             {
                 var log = new EFraudLog
                 {
-                    TransactionId = transactionId,
                     RuleId = rule.RuleId,
                     LogDate = DateTime.Now,
                     Status = "Unresolved"
                 };
+
+                if (paymentType == PaymentTypeEnum.CreditCard)
+                {
+                    log.CreditCardTransactionId = transactionId;
+                }
+                else if (paymentType == PaymentTypeEnum.DebitCard)
+                {
+                    log.DebitCardTransactionId = transactionId;
+                }
+                else if (paymentType == PaymentTypeEnum.EFT || paymentType == PaymentTypeEnum.BankTransfer)
+                {
+                    log.TransferTransactionId = transactionId;
+                }
+
                 await _fraudLogRepository.AddAsync(log);
             }
         }

@@ -86,7 +86,21 @@ using (var scope = app.Services.CreateScope())
         try
         {
             Console.WriteLine($"Veritabanına bağlanılıyor ve tablolar oluşturuluyor (Deneme {retry}/{maxRetries})...");
-            context.Database.EnsureCreated();
+            
+            // Database exists empty check
+            if (!context.Database.CanConnect())
+            {
+                context.Database.EnsureCreated();
+            }
+            else
+            {
+                var creator = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Storage.IDatabaseCreator>(context.Database) as Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator;
+                if (creator != null && !creator.HasTables())
+                {
+                    creator.CreateTables();
+                }
+            }
+
             Console.WriteLine("Veritabanı ve tablolar başarıyla oluşturuldu!");
             dbCreated = true;
             break;

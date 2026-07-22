@@ -4,3 +4,117 @@ body {
     margin: 0;
     padding: 0;
 }
+
+/* Custom Checkbox Styles */
+.custom-checkbox-cont {
+    display: flex;
+    align-items: center;
+    transform: scale(1);
+}
+
+.custom-checkbox {
+    height: 1.4rem;
+    width: 1.4rem;
+    margin: 5px;
+    display: inline-block;
+    appearance: none;
+    position: relative;
+    background-color: #F2ECFF;
+    border: 2px solid #D1D5DB;
+    border-radius: 20%;
+    cursor: pointer;
+    overflow: hidden;
+    outline: none;
+    box-shadow: none;
+}
+
+.custom-checkbox::after {
+    content: '';
+    display: block;
+    height: 0.7rem;
+    width: 0.3rem;
+    border-bottom: 0.22rem solid #a0ffe7;
+    border-right: 0.22rem solid #a0ffe7;
+    opacity: 0;
+    transform: rotate(45deg) translate(-50%, -50%);
+    position: absolute;
+    top: 40%;
+    left: 21%;
+    transition: .25s ease;
+}
+
+.custom-checkbox::before {
+    content: '';
+    display: block;
+    height: 0;
+    width: 0;
+    background-color: #00C896;
+    border-radius: 50%;
+    opacity: 0.5;
+    transform: translate(-50%, -50%);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transition: 0.3s ease;
+}
+
+.custom-checkbox:checked::before {
+    height: 140%;
+    width: 140%;
+    opacity: 100%;
+}
+
+.custom-checkbox:checked::after {
+    opacity: 100%;
+}
+
+.custom-checkbox:focus {
+    outline: none;
+}
+
+/* Giriş Animasyonu (Soldan Süzülme) */
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Çıkış Animasyonu (Sağa Doğru Kayıp Yok Olma ve Yükseklik Küçültme) */
+@keyframes slideOutRight {
+    0% {
+        opacity: 1;
+        transform: translateX(0);
+        line-height: normal;
+    }
+
+    50% {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(100px);
+        height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border: none;
+        line-height: 0;
+        display: none;
+    }
+}
+
+.row-enter {
+    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.row-exit {
+    animation: slideOutRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    pointer-events: none;
+}

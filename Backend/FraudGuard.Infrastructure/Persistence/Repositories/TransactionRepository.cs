@@ -1,4 +1,5 @@
 using FraudGuard.Domain.Entities;
+using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Interfaces.Repositories;
 using FraudGuard.Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -12,106 +13,191 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
     public class TransactionRepository : ITransactionRepository
     {
         private readonly FraudGuardDbContext _context;
-        
 
         public TransactionRepository(FraudGuardDbContext context)
         {
             _context = context;
         }
 
-        public async Task AddAsync(ETransaction transaction)
+        public async Task AddCreditCardTransactionAsync(ECreditCardTransaction transaction)
         {
-            await _context.Transactions.AddAsync(transaction);
+            await _context.CreditCardTransactions.AddAsync(transaction);
         }
 
-        public async Task<List<ETransaction>> GetRecentTransactionsAsync(int cardId, TimeSpan timeWindow)
+        public async Task AddDebitCardTransactionAsync(EDebitCardTransaction transaction)
+        {
+            await _context.DebitCardTransactions.AddAsync(transaction);
+        }
+
+        public async Task AddTransferTransactionAsync(ETransferTransaction transaction)
+        {
+            await _context.TransferTransactions.AddAsync(transaction);
+        }
+
+        public async Task<List<ITransaction>> GetRecentTransactionsAsync(int cardId, bool isCreditCard, TimeSpan timeWindow)
         {
             var cutoffTime = DateTime.Now.Subtract(timeWindow);
-            
-            return await _context.Transactions
-                .Where(t => (t.CreditCardId == cardId || t.DebitCardId == cardId) && t.TransactionDate >= cutoffTime)
-                .ToListAsync();
+
+            if (isCreditCard)
+            {
+                var txs = await _context.CreditCardTransactions
+                    .Where(t => t.CreditCardId == cardId && t.TransactionDate >= cutoffTime)
+                    .ToListAsync();
+                return txs.Cast<ITransaction>().ToList();
+            }
+            else
+            {
+                var txs = await _context.DebitCardTransactions
+                    .Where(t => t.DebitCardId == cardId && t.TransactionDate >= cutoffTime)
+                    .ToListAsync();
+                return txs.Cast<ITransaction>().ToList();
+            }
         }
+
         public async Task<bool> HasAnySuspiciousTransactionAsync(int cardId, bool isCreditCard)
         {
             if (isCreditCard)
             {
-                return await _context.Transactions.AnyAsync(t => 
+                return await _context.CreditCardTransactions.AnyAsync(t => 
                     t.CreditCardId == cardId && 
-                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.Status == "SuspiciousVoid" || 
+                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || 
                      (t.FraudLog != null && !t.FraudLog.IsResolved)));
             }
             else
             {
-                return await _context.Transactions.AnyAsync(t => 
+                return await _context.DebitCardTransactions.AnyAsync(t => 
                     t.DebitCardId == cardId && 
-                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.Status == "SuspiciousVoid" || 
+                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || 
                      (t.FraudLog != null && !t.FraudLog.IsResolved)));
             }
         }
-        public async Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId)
+
+        public async Task<List<ITransaction>> GetLast10TransactionsForCardAsync(int cardId, bool isCreditCard, DateTime beforeDate)
         {
-            return await _context.Transactions
-                .Include(t => t.TransactionType)
-                .Include(t => t.FraudLog)
-                    .ThenInclude(fl => fl.FraudRule)
-                .Where(t => (t.CreditCardId == cardId || t.DebitCardId == cardId) && t.TransactionId != excludeTransactionId)
-                .OrderByDescending(t => t.TransactionDate)
-                .Take(10)
-                .ToListAsync();
+            if (isCreditCard)
+            {
+                var txs = await _context.CreditCardTransactions
+                    .Include(t => t.TransactionType)
+                    .Include(t => t.FraudLog)
+                        .ThenInclude(fl => fl.FraudRule)
+                    .Where(t => t.CreditCardId == cardId && t.TransactionDate < beforeDate)
+                    .OrderByDescending(t => t.TransactionDate)
+                    .Take(10)
+                    .ToListAsync();
+                return txs.Cast<ITransaction>().ToList();
+            }
+            else
+            {
+                var txs = await _context.DebitCardTransactions
+                    .Include(t => t.TransactionType)
+                    .Include(t => t.FraudLog)
+                        .ThenInclude(fl => fl.FraudRule)
+                    .Where(t => t.DebitCardId == cardId && t.TransactionDate < beforeDate)
+                    .OrderByDescending(t => t.TransactionDate)
+                    .Take(10)
+                    .ToListAsync();
+                return txs.Cast<ITransaction>().ToList();
+            }
         }
 
-        public async Task<int> GetUnrefundedSaleCountAsync(int cardId, decimal amount, string currency)
+        public async Task<List<ITransaction>> GetLast10SuspiciousTransactionsForCardAsync(int cardId, bool isCreditCard, DateTime beforeDate)
         {
-            var approvedSalesCount = await _context.Transactions.CountAsync(t => 
-                (t.CreditCardId == cardId || t.DebitCardId == cardId) && 
-                t.TransactionTypeId == 1 && // 1: Sale
-                t.Amount == amount && 
-                t.Currency == currency && 
-                t.Status == "Approved");
-
-            var refundsCount = await _context.Transactions.CountAsync(t => 
-                (t.CreditCardId == cardId || t.DebitCardId == cardId) && 
-                t.TransactionTypeId == 2 && // 2: Refund
-                t.Amount == amount && 
-                t.Currency == currency && 
-                (t.Status == "Approved" || t.Status == "Suspicious"));
-
-            return approvedSalesCount - refundsCount;
+            if (isCreditCard)
+            {
+                var txs = await _context.CreditCardTransactions
+                    .Include(t => t.TransactionType)
+                    .Include(t => t.FraudLog)
+                        .ThenInclude(fl => fl.FraudRule)
+                    .Where(t => t.CreditCardId == cardId && t.TransactionDate < beforeDate && (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.FraudLog != null))
+                    .OrderByDescending(t => t.TransactionDate)
+                    .Take(10)
+                    .ToListAsync();
+                return txs.Cast<ITransaction>().ToList();
+            }
+            else
+            {
+                var txs = await _context.DebitCardTransactions
+                    .Include(t => t.TransactionType)
+                    .Include(t => t.FraudLog)
+                        .ThenInclude(fl => fl.FraudRule)
+                    .Where(t => t.DebitCardId == cardId && t.TransactionDate < beforeDate && (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.FraudLog != null))
+                    .OrderByDescending(t => t.TransactionDate)
+                    .Take(10)
+                    .ToListAsync();
+                return txs.Cast<ITransaction>().ToList();
+            }
         }
 
-        public async Task<List<ETransaction>> GetRecentTransactionsByReceiverIBANAsync(string receiverIBAN, TimeSpan timeWindow)
+        public async Task<bool> HasBeenRefundedAsync(string rrn, int cardId, bool isCreditCard)
+        {
+            if (isCreditCard)
+            {
+                return await _context.CreditCardTransactions.AnyAsync(t => 
+                    t.CreditCardId == cardId && 
+                    t.RRN == rrn && 
+                    t.TransactionTypeId == 2 && // 2: Refund
+                    (t.Status == "Approved" || t.Status == "Suspicious" || t.Status == "SuspiciousRefund"));
+            }
+            else
+            {
+                return await _context.DebitCardTransactions.AnyAsync(t => 
+                    t.DebitCardId == cardId && 
+                    t.RRN == rrn && 
+                    t.TransactionTypeId == 2 && // 2: Refund
+                    (t.Status == "Approved" || t.Status == "Suspicious" || t.Status == "SuspiciousRefund"));
+            }
+        }
+
+        public async Task<ITransaction?> GetOriginalSaleByRrnAsync(string rrn, int cardId, bool isCreditCard)
+        {
+            if (isCreditCard)
+            {
+                var tx = await _context.CreditCardTransactions
+                    .FirstOrDefaultAsync(t => t.CreditCardId == cardId && t.RRN == rrn && t.TransactionTypeId == 1 && t.Status == "Approved");
+                return tx;
+            }
+            else
+            {
+                var tx = await _context.DebitCardTransactions
+                    .FirstOrDefaultAsync(t => t.DebitCardId == cardId && t.RRN == rrn && t.TransactionTypeId == 1 && t.Status == "Approved");
+                return tx;
+            }
+        }
+
+        public async Task<List<ETransferTransaction>> GetRecentTransferTransactionsByReceiverIBANAsync(string receiverIBAN, TimeSpan timeWindow)
         {
             var cutoffTime = DateTime.Now.Subtract(timeWindow);
-            return await _context.Transactions
+            return await _context.TransferTransactions
                 .Where(t => t.ReceiverIBAN == receiverIBAN && t.TransactionDate >= cutoffTime)
                 .ToListAsync();
         }
 
-        public async Task<ETransaction?> GetByIdAsync(int id)
+        public async Task<List<ETransferTransaction>> GetRecentTransferTransactionsBySenderIBANAsync(string senderIBAN, TimeSpan timeWindow)
         {
-            return await _context.Transactions
+            var cutoffTime = DateTime.Now.Subtract(timeWindow);
+            return await _context.TransferTransactions
+                .Where(t => t.SenderIBAN == senderIBAN && t.TransactionDate >= cutoffTime)
+                .ToListAsync();
+        }
+
+        public async Task<ECreditCardTransaction?> GetCreditCardByIdAsync(int id)
+        {
+            return await _context.CreditCardTransactions
                 .Include(t => t.CreditCard)
+                .FirstOrDefaultAsync(t => t.TransactionId == id);
+        }
+
+        public async Task<EDebitCardTransaction?> GetDebitCardByIdAsync(int id)
+        {
+            return await _context.DebitCardTransactions
                 .Include(t => t.DebitCard)
                 .FirstOrDefaultAsync(t => t.TransactionId == id);
         }
 
-        public async Task<bool> HasBeenVoidedAsync(int originalTransactionId)
+        public async Task<ETransferTransaction?> GetTransferByIdAsync(int id)
         {
-            return await _context.Transactions.AnyAsync(t => 
-                t.OriginalTransactionId == originalTransactionId && 
-                t.TransactionTypeId == 3 && // 3: Void
-                (t.Status == "Approved" || t.Status == "Suspicious"));
-        }
-
-        public async Task<decimal> GetTotalRefundedAmountAsync(int originalTransactionId)
-        {
-            return await _context.Transactions
-                .Where(t => 
-                    t.OriginalTransactionId == originalTransactionId && 
-                    t.TransactionTypeId == 2 && // 2: Refund
-                    (t.Status == "Approved" || t.Status == "Suspicious"))
-                .SumAsync(t => t.Amount);
+            return await _context.TransferTransactions
+                .FirstOrDefaultAsync(t => t.TransactionId == id);
         }
     }
 }

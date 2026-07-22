@@ -1,4 +1,5 @@
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
+using FraudGuard.Domain.Common.Enums;
 using System.Threading.Tasks;
 
 namespace FraudGuard.Domain.Interfaces.DomainServices
@@ -6,6 +7,6 @@ namespace FraudGuard.Domain.Interfaces.DomainServices
     public interface IFraudEvaluationService
     {
         Task<(string? RuleCode, string? FraudReason)> EvaluateAsync(ProcessTransactionInput input, int cardId);        
-        Task CreateFraudLogAsync(int transactionId, string ruleCode);
+        Task CreateFraudLogAsync(int transactionId, string ruleCode, PaymentTypeEnum paymentType);
     }
 }

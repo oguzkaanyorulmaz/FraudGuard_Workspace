@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Rules;
@@ -12,7 +13,7 @@ namespace FraudGuard.Domain.Services.Rules
         public string RuleCode => "HIGH_RISK_RECEIVER";
         public string RuleName => "Şüpheli Alıcı Hesabı / Katır Hesap (EFT/Havale)";
 
-        public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
+        public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ITransaction> history)
         {
             if (!string.IsNullOrEmpty(input.ReceiverIBAN))
             {

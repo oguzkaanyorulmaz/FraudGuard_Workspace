@@ -11,9 +11,20 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             builder.HasKey(f => f.LogId);
             builder.Property(f => f.AdminAction).HasMaxLength(50);
 
-            builder.HasOne(f => f.Transaction)
+            // Üç bağımsız tabloya bağlanan One-to-One / Nullable ilişkiler
+            builder.HasOne(f => f.CreditCardTransaction)
                    .WithOne(t => t.FraudLog)
-                   .HasForeignKey<EFraudLog>(f => f.TransactionId)
+                   .HasForeignKey<EFraudLog>(f => f.CreditCardTransactionId)
+                   .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(f => f.DebitCardTransaction)
+                   .WithOne(t => t.FraudLog)
+                   .HasForeignKey<EFraudLog>(f => f.DebitCardTransactionId)
+                   .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(f => f.TransferTransaction)
+                   .WithOne(t => t.FraudLog)
+                   .HasForeignKey<EFraudLog>(f => f.TransferTransactionId)
                    .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(f => f.FraudRule)

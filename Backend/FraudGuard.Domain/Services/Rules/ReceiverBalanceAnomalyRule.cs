@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
@@ -24,14 +25,14 @@ namespace FraudGuard.Domain.Services.Rules
         public string RuleCode => "RECEIVER_BALANCE_ANOMALY";
         public string RuleName => "Katır Hesap Bakiye Sapması";
 
-        public async Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
+        public async Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ITransaction> history)
         {
             if (input.PaymentType == PaymentTypeEnum.EFT || input.PaymentType == PaymentTypeEnum.BankTransfer)
             {
                 var receiverDebit = await _debitCardRepository.GetByIBANAsync(input.ReceiverIBAN);
                 if (receiverDebit != null)
                 {
-                    var receiverRecentTx = await _transactionRepository.GetRecentTransactionsAsync(receiverDebit.CardId, TimeSpan.FromDays(30));
+                    var receiverRecentTx = await _transactionRepository.GetRecentTransactionsAsync(receiverDebit.CardId, isCreditCard: false, TimeSpan.FromDays(30));
                     bool isPassiveAccount = !receiverRecentTx.Any(t => t.Status == "Approved");
                     if (isPassiveAccount && input.Amount >= 5000)
                     {

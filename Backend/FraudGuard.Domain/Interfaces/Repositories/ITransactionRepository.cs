@@ -1,4 +1,5 @@
 using FraudGuard.Domain.Entities;
+using FraudGuard.Domain.Interfaces.Entities;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -7,14 +8,28 @@ namespace FraudGuard.Domain.Interfaces.Repositories
 {
     public interface ITransactionRepository
     {
-        Task AddAsync(ETransaction transaction);
-        Task<List<ETransaction>> GetRecentTransactionsAsync(int cardId, TimeSpan timeWindow);
+        // Kayıt ekleme metotları
+        Task AddCreditCardTransactionAsync(ECreditCardTransaction transaction);
+        Task AddDebitCardTransactionAsync(EDebitCardTransaction transaction);
+        Task AddTransferTransactionAsync(ETransferTransaction transaction);
+
+        // Kural kontrolleri ve geçmiş sorguları
+        Task<List<ITransaction>> GetRecentTransactionsAsync(int cardId, bool isCreditCard, TimeSpan timeWindow);
         Task<bool> HasAnySuspiciousTransactionAsync(int cardId, bool isCreditCard);
-        Task<List<ETransaction>> GetLast10TransactionsForCardAsync(int cardId, int excludeTransactionId);
-        Task<int> GetUnrefundedSaleCountAsync(int cardId, decimal amount, string currency);
-        Task<List<ETransaction>> GetRecentTransactionsByReceiverIBANAsync(string receiverIBAN, TimeSpan timeWindow);
-        Task<ETransaction?> GetByIdAsync(int id);
-        Task<bool> HasBeenVoidedAsync(int originalTransactionId);
-        Task<decimal> GetTotalRefundedAmountAsync(int originalTransactionId);
+        Task<List<ITransaction>> GetLast10TransactionsForCardAsync(int cardId, bool isCreditCard, DateTime beforeDate);
+        Task<List<ITransaction>> GetLast10SuspiciousTransactionsForCardAsync(int cardId, bool isCreditCard, DateTime beforeDate);
+        
+        // RRN bazlı mükerrer iade (Refund) engelleme kontrolü
+        Task<bool> HasBeenRefundedAsync(string rrn, int cardId, bool isCreditCard);
+        Task<ITransaction?> GetOriginalSaleByRrnAsync(string rrn, int cardId, bool isCreditCard);
+        
+        // Transfer bazlı sorgular
+        Task<List<ETransferTransaction>> GetRecentTransferTransactionsByReceiverIBANAsync(string receiverIBAN, TimeSpan timeWindow);
+        Task<List<ETransferTransaction>> GetRecentTransferTransactionsBySenderIBANAsync(string senderIBAN, TimeSpan timeWindow);
+
+        // Tekil sorgulamalar
+        Task<ECreditCardTransaction?> GetCreditCardByIdAsync(int id);
+        Task<EDebitCardTransaction?> GetDebitCardByIdAsync(int id);
+        Task<ETransferTransaction?> GetTransferByIdAsync(int id);
     }
 }

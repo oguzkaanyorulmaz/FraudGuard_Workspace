@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
@@ -22,11 +23,11 @@ namespace FraudGuard.Domain.Services.Rules
         public string RuleCode => "MULTI_SOURCE_FUNDING";
         public string RuleName => "Çoklu Kaynakla Fonlama";
 
-        public async Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
+        public async Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ITransaction> history)
         {
             if (input.PaymentType == PaymentTypeEnum.EFT || input.PaymentType == PaymentTypeEnum.BankTransfer)
             {
-                var receiverHistory = await _transactionRepository.GetRecentTransactionsByReceiverIBANAsync(input.ReceiverIBAN, TimeSpan.FromMinutes(30));
+                var receiverHistory = await _transactionRepository.GetRecentTransferTransactionsByReceiverIBANAsync(input.ReceiverIBAN, TimeSpan.FromMinutes(30));
                 var distinctSendersCount = receiverHistory
                     .Where(t => t.Status == "Approved" && !string.IsNullOrEmpty(t.SenderIBAN) && t.SenderIBAN != input.SenderIBAN)
                     .Select(t => t.SenderIBAN)

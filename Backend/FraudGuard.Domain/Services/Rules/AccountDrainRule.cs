@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
@@ -20,7 +21,7 @@ namespace FraudGuard.Domain.Services.Rules
         public string RuleCode => "ACCOUNT_DRAIN";
         public string RuleName => "Hesap Boşaltma Denemesi (Account Drain - Banka Kartı)";
 
-        public async Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
+        public async Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ITransaction> history)
         {
             if (input.PaymentType == PaymentTypeEnum.DebitCard)
             {

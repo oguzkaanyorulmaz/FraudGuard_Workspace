@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Application.Helpers;
 using FraudGuard.Domain.Entities;
+using FraudGuard.Domain.Interfaces.Entities;
 
 
 namespace FraudGuard.Application.Services
@@ -46,8 +47,8 @@ namespace FraudGuard.Application.Services
                 item.RuleName = originalLog.FraudRule?.RuleName ?? "Genel Şüpheli İşlem";
 
                 var tx = originalLog.Transaction;
-                var cc = tx?.CreditCard;
-                var dc = tx?.DebitCard;
+                var cc = originalLog.CreditCardTransaction?.CreditCard;
+                var dc = originalLog.DebitCardTransaction?.DebitCard;
 
                 if (tx != null && originalLog.FraudRule != null)
                 {
@@ -91,24 +92,38 @@ namespace FraudGuard.Application.Services
             {
                 return ResponseDTO<GetFraudLogDetailResponse>.Fail("Log detayları bulunamadı.");
             }
-            var targetCardId = logEntity.Transaction.CreditCardId ?? logEntity.Transaction.DebitCardId ?? 0;
-            var recentTxList = await _transactionRepository.GetLast10TransactionsForCardAsync(targetCardId, logEntity.TransactionId);
-            var creditCard = logEntity.Transaction.CreditCard;
-            var debitCard = logEntity.Transaction.DebitCard;
+            bool isCredit = logEntity.CreditCardTransactionId.HasValue;
+            var targetCardId = logEntity.Transaction?.CreditCardId ?? logEntity.Transaction?.DebitCardId ?? 0;
+            var activeTxDate = logEntity.Transaction?.TransactionDate ?? DateTime.UtcNow;
+            
+            var recentTxList = await _transactionRepository.GetLast10TransactionsForCardAsync(
+                targetCardId, 
+                isCredit, 
+                activeTxDate);
+            var recentSuspiciousTxList = await _transactionRepository.GetLast10SuspiciousTransactionsForCardAsync(
+                targetCardId,
+                isCredit,
+                activeTxDate);
+            var creditCard = logEntity.CreditCardTransaction?.CreditCard;
+            var debitCard = logEntity.DebitCardTransaction?.DebitCard;
             var customer = creditCard?.Customer ?? debitCard?.Customer;
+            var isCardSuspicious = await _transactionRepository.HasAnySuspiciousTransactionAsync(targetCardId, isCredit);
 
             var detail = new GetFraudLogDetailResponse
             {
+                IsCardSuspicious = isCardSuspicious,
                 LogId = logEntity.LogId, 
-                TransactionId = logEntity.TransactionId,
-                Amount = logEntity.Transaction.Amount,
-                Currency = logEntity.Transaction.Currency,
-                TransactionDate = logEntity.Transaction.TransactionDate,
-                Location = logEntity.Transaction.Location,
-                Country = logEntity.Transaction.Country,
-                TransactionTypeName = logEntity.Transaction.TransactionType?.Description ?? "Bilinmeyen",
+                TransactionId = logEntity.Transaction?.TransactionId ?? 0,
+                Amount = logEntity.Transaction?.Amount ?? 0,
+                Currency = logEntity.Transaction?.Currency ?? "TRY",
+                TransactionDate = logEntity.Transaction?.TransactionDate ?? System.DateTime.Now,
+                Location = logEntity.Transaction?.Location ?? "Bilinmiyor",
+                Country = logEntity.Transaction?.Country ?? "Bilinmiyor",
+                TransactionTypeName = isCredit 
+                    ? (logEntity.CreditCardTransaction?.TransactionType?.Description ?? "Bilinmeyen") 
+                    : (logEntity.DebitCardTransaction?.TransactionType?.Description ?? "Bilinmeyen"),
                 
-                MaskedCardNumber = creditCard?.CardNumber ?? debitCard?.CardNumber ?? logEntity.Transaction.SenderIBAN ?? "Bilinmiyor", 
+                MaskedCardNumber = creditCard?.CardNumber ?? debitCard?.CardNumber ?? logEntity.Transaction?.SenderIBAN ?? "Bilinmiyor", 
                 CardLimit = creditCard?.CardLimit ?? 0,
                 AvailableLimit = creditCard?.AvailableLimit ?? debitCard?.Balance ?? 0,
                 IsCardBlocked = creditCard?.IsBlocked ?? debitCard?.IsBlocked ?? false,
@@ -129,7 +144,7 @@ namespace FraudGuard.Application.Services
                     Currency = t.Currency,
                     Location = t.Location,
                     Country = t.Country,
-                    TransactionTypeName = t.TransactionType?.Description ?? "Bilinmeyen",
+                    TransactionTypeName = t.TransactionTypeId == 1 ? "Satış İşlemi" : (t.TransactionTypeId == 2 ? "İade İşlemi" : "Transfer İşlemi"),
                     TransactionDate = t.TransactionDate,
                     MerchantCategory = t.MerchantCategory,
                     Status = t.Status,
@@ -138,7 +153,26 @@ namespace FraudGuard.Application.Services
                     AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
                     
                     ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
-                    DeclineReason = t.DeclineReason
+                    DeclineReason = t.DeclineReason,
+                    PaymentTypeCode = t.PaymentType.ToString()
+                }).ToList(),
+                RecentSuspiciousTransactions = recentSuspiciousTxList.Select(t => new CardRecentTransactionDto
+                {
+                    Amount = t.Amount,
+                    Currency = t.Currency,
+                    Location = t.Location,
+                    Country = t.Country,
+                    TransactionTypeName = t.TransactionTypeId == 1 ? "Satış İşlemi" : (t.TransactionTypeId == 2 ? "İade İşlemi" : "Transfer İşlemi"),
+                    TransactionDate = t.TransactionDate,
+                    MerchantCategory = t.MerchantCategory,
+                    Status = t.Status,
+                    
+                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    
+                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    DeclineReason = t.DeclineReason,
+                    PaymentTypeCode = t.PaymentType.ToString()
                 }).ToList()
             };
 
@@ -168,8 +202,8 @@ namespace FraudGuard.Application.Services
                 item.RuleName = originalLog.FraudRule?.RuleName ?? "Genel Şüpheli İşlem";
 
                 var tx = originalLog.Transaction;
-                var cc = tx?.CreditCard;
-                var dc = tx?.DebitCard;
+                var cc = originalLog.CreditCardTransaction?.CreditCard;
+                var dc = originalLog.DebitCardTransaction?.DebitCard;
 
                 if (tx != null && originalLog.FraudRule != null)
                 {
@@ -190,7 +224,7 @@ namespace FraudGuard.Application.Services
             return ResponseDTO<List<GetUnresolvedLogsResponse>>.Success(responseList);
         }
 
-        private int CalculateRiskScore(string ruleCode, ETransaction tx)
+        private int CalculateRiskScore(string ruleCode, ITransaction tx)
         {
             // 1. Baz Kural Ağırlığı
             int ruleWeight = ruleCode switch
@@ -264,15 +298,15 @@ namespace FraudGuard.Application.Services
             decimal cardLimit = 0;
             decimal availableLimit = 0;
 
-            if (tx.CreditCard != null)
+            if (tx is ECreditCardTransaction ccTx && ccTx.CreditCard != null)
             {
-                cardLimit = tx.CreditCard.CardLimit;
-                availableLimit = tx.CreditCard.AvailableLimit;
+                cardLimit = ccTx.CreditCard.CardLimit;
+                availableLimit = ccTx.CreditCard.AvailableLimit;
             }
-            else if (tx.DebitCard != null)
+            else if (tx is EDebitCardTransaction dcTx && dcTx.DebitCard != null)
             {
                 cardLimit = 100000; // Varsayılan limit eşiği
-                availableLimit = tx.DebitCard.Balance;
+                availableLimit = dcTx.DebitCard.Balance;
             }
 
             if (cardLimit > 0)

@@ -57,20 +57,7 @@ public async Task<bool> ResolveFraudLogAsync(
 
             if (adminAction == "MarkAsSafe" || adminAction == "APPROVE" || adminAction == "Approve")
             {
-                if (log.Transaction.Status == "SuspiciousRefund")
-                {
-                    log.Transaction.Status = "Refund";
-                    log.Transaction.RefundTime = DateTime.Now;
-                }
-                else if (log.Transaction.Status == "SuspiciousVoid")
-                {
-                    log.Transaction.Status = "Void";
-                    log.Transaction.RefundTime = DateTime.Now;
-                }
-                else
-                {
-                    log.Transaction.Status = "Approved";
-                }
+                log.Transaction.Status = "Approved";
 
                 if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.ReceiverIBAN))
                 {
@@ -84,24 +71,16 @@ public async Task<bool> ResolveFraudLogAsync(
             }
             else if (adminAction == "CardBlocked" || adminAction == "MarkAsFraud" || adminAction == "BLOCK")
             {
-                bool isRefundOrVoidReversal = log.Transaction.Status == "SuspiciousRefund" || log.Transaction.Status == "SuspiciousVoid";
+                bool isRefundReversal = log.Transaction.Status == "SuspiciousRefund";
 
-                if (isRefundOrVoidReversal)
-                {
-                    log.Transaction.Status = "Approved";
-                    log.Transaction.RefundTime = null;
-                }
-                else
-                {
-                    log.Transaction.Status = "Declined";
-                }
+                log.Transaction.Status = "Declined";
 
                 if (log.Transaction.CreditCardId.HasValue)
                 {
                     var creditCard = await _creditCardRepository.GetByIdAsync(log.Transaction.CreditCardId.Value);
                     if (creditCard != null)
                     {
-                        if (isRefundOrVoidReversal)
+                        if (isRefundReversal)
                         {
                             creditCard.AvailableLimit = Math.Max(0, creditCard.AvailableLimit - convertedAmount);
                         }
@@ -119,7 +98,7 @@ public async Task<bool> ResolveFraudLogAsync(
                     var debitCard = await _debitCardRepository.GetByIdAsync(log.Transaction.DebitCardId.Value);
                     if (debitCard != null)
                     {
-                        if (isRefundOrVoidReversal)
+                        if (isRefundReversal)
                         {
                             debitCard.Balance = Math.Max(0, debitCard.Balance - convertedAmount);
                         }
@@ -140,13 +119,13 @@ public async Task<bool> ResolveFraudLogAsync(
 
         if (log.Transaction != null)
         {
-            if (log.Transaction.CreditCard != null)
+            if (log.Transaction is ECreditCardTransaction ccTx && ccTx.CreditCard != null)
             {
-                await _cacheProvider.RemoveAsync($"card_info_{log.Transaction.CreditCard.CardNumber}");
+                await _cacheProvider.RemoveAsync($"card_info_{ccTx.CreditCard.CardNumber}");
             }
-            if (log.Transaction.DebitCard != null)
+            if (log.Transaction is EDebitCardTransaction dcTx && dcTx.DebitCard != null)
             {
-                await _cacheProvider.RemoveAsync($"card_info_{log.Transaction.DebitCard.CardNumber}");
+                await _cacheProvider.RemoveAsync($"card_info_{dcTx.DebitCard.CardNumber}");
             }
             if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.ReceiverIBAN))
             {

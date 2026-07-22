@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
@@ -14,7 +15,7 @@ namespace FraudGuard.Domain.Services.Rules
         public string RuleCode => "IMPOSSIBLE_TRAVEL";
         public string RuleName => "Lokasyon/Mesafe Kuralı (Impossible Travel)";
 
-        public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ETransaction> history)
+        public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ITransaction> history)
         {
             if (input.TransactionType != TransactionTypeEnum.Sale)
             {

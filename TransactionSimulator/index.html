@@ -149,7 +149,6 @@
                             <select id="transactionType" required>
                                 <option value="1">💳 Satış İşlemi</option>
                                 <option value="2">↩️ İade İşlemi</option>
-                                <option value="3">🚫 İptal İşlemi</option>
                             </select>
                         </div>
                     </div>
@@ -163,15 +162,15 @@
                         </div>
                     </div>
 
-                    <div class="form-group" id="originalTransactionGroup" style="display: none;">
-                        <label for="originalTransactionId">Orijinal İşlem ID</label>
+                    <div class="form-group" id="rrnGroup" style="display: none;">
+                        <label for="rrnInput">RRN (Referans No)</label>
                         <div class="input-wrapper">
                             <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                 <polyline points="14 2 14 8 20 8" />
                             </svg>
-                            <input type="number" id="originalTransactionId" placeholder="Örn: 1">
+                            <input type="text" id="rrnInput" placeholder="Örn: 260722154321" maxlength="12">
                         </div>
                     </div>
 
@@ -428,6 +427,14 @@
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
                     Temizle
+                </button>
+            </div>
+            <div class="history-filter-tabs">
+                <button class="history-filter-btn active" data-filter="all" id="filterAll" onclick="setHistoryFilter('all')">
+                    📋 Tüm İşlemler
+                </button>
+                <button class="history-filter-btn" data-filter="suspicious" id="filterSuspicious" onclick="setHistoryFilter('suspicious')">
+                    ⚠️ Şüpheli İşlemler
                 </button>
             </div>
             <div class="history-list" id="historyList"></div>

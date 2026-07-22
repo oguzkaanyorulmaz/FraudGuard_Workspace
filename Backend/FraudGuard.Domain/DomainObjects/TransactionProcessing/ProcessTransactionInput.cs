@@ -23,5 +23,6 @@ namespace FraudGuard.Domain.DomainObjects.TransactionProcessing
         public string Country { get; set; } = "Türkiye";
         public string MerchantCategory { get; set; } = "Diğer";
         public int? OriginalTransactionId { get; set; }
+        public string? RRN { get; set; }
     }
 }
