@@ -76,9 +76,9 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
 
 
 
-            // 5. Customers Seeding (1-20)
+            // 5. Customers Seeding (1-45)
             var customers = new List<ECustomer>();
-            for (int i = 1; i <= 20; i++)
+            for (int i = 1; i <= 45; i++)
             {
                 customers.Add(new ECustomer
                 {
@@ -93,9 +93,9 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
             }
             modelBuilder.Entity<ECustomer>().HasData(customers);
 
-            // 6. Credit Cards Seeding (1-20)
+            // 6. Credit Cards Seeding (1-45)
             var creditCards = new List<ECreditCard>();
-            for (int i = 1; i <= 20; i++)
+            for (int i = 1; i <= 45; i++)
             {
                 creditCards.Add(new ECreditCard
                 {
@@ -121,9 +121,9 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
                 new EChannelType { ChannelTypeId = 5, ChannelCode = "Web", Description = "İnternet Şubesi" }
             );
 
-            // 8. Debit Cards Seeding (1-20)
+            // 8. Debit Cards Seeding (1-45)
             var debitCards = new List<EDebitCard>();
-            for (int i = 1; i <= 20; i++)
+            for (int i = 1; i <= 45; i++)
             {
                 debitCards.Add(new EDebitCard
                 {

@@ -131,6 +131,21 @@ namespace FraudGuard.Domain.Services
             {
                 if (activeRuleCodes.Contains(rule.RuleCode))
                 {
+                    // İade işlemleri sadece iade kurallarına (CONSECUTIVE_REFUNDS, HIGH_VALUE_REFUND_VOID) tabi tutulsun
+                    if (input.TransactionType == TransactionTypeEnum.Refund && 
+                        rule.RuleCode != "CONSECUTIVE_REFUNDS" && 
+                        rule.RuleCode != "HIGH_VALUE_REFUND_VOID")
+                    {
+                        continue;
+                    }
+
+                    // Satış işlemleri iade kurallarından muaf tutulsun
+                    if (input.TransactionType == TransactionTypeEnum.Sale && 
+                        (rule.RuleCode == "CONSECUTIVE_REFUNDS" || rule.RuleCode == "HIGH_VALUE_REFUND_VOID"))
+                    {
+                        continue;
+                    }
+
                     var (isSuspicious, reason) = await rule.EvaluateAsync(input, recentTransactions);
                     if (isSuspicious)
                     {

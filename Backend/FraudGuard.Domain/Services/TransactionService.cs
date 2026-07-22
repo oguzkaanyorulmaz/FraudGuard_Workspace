@@ -219,13 +219,6 @@ namespace FraudGuard.Domain.Services
                     return result;
                 }
 
-                if (cachedCard.CVV != input.CVV)
-                {
-                    result.Status = "Declined";
-                    result.DeclineReason = "Hatalı CVV";
-                    return result;
-                }
-
                 var creditCard = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
                 var debitCard = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
                 bool isCredit = creditCard != null;
@@ -241,26 +234,45 @@ namespace FraudGuard.Domain.Services
                     return result;
                 }
 
+                bool isCvvIncorrect = (cardCvv != input.CVV);
+                bool isCvvSuspicious = false;
+
                 if (isBlocked)
                 {
                     result.Status = "Declined";
                     result.DeclineReason = "Kart Blokeli";
                 }
-                else if (cardCvv != input.CVV) 
+                else if (isCvvIncorrect) 
                 {
-                    result.Status = "Declined";
-                    result.DeclineReason = "Hatalı CVV";
+                    string cvvFailKey = $"cvv_fail_cnt_{input.CardNumber}";
+                    int failCount = (await _cacheProvider.GetAsync<int>(cvvFailKey)) + 1;
+                    await _cacheProvider.SetAsync(cvvFailKey, failCount, TimeSpan.FromMinutes(30));
+
+                    if (failCount >= 3)
+                    {
+                        isCvvSuspicious = true;
+                        result.Status = "Suspicious";
+                        result.DeclineReason = "Fraud Şüphesi: BRUTE_FORCE";
+                        await _cacheProvider.RemoveAsync(cvvFailKey);
+                    }
+                    else
+                    {
+                        result.Status = "Declined";
+                        result.DeclineReason = "Hatalı CVV";
+                    }
                 }
                 else
                 {
                     result.Status = "Approved";
+                    string cvvFailKey = $"cvv_fail_cnt_{input.CardNumber}";
+                    await _cacheProvider.RemoveAsync(cvvFailKey);
                 }
 
                 decimal processedAmount = await _currencyService.ConvertToTryAsync(input.Amount, input.Currency);
 
-                bool isSuspicious = false;
-                string? triggeredRuleCode = null;
-                string? capturedFraudReason = null;
+                bool isSuspicious = isCvvSuspicious;
+                string? triggeredRuleCode = isCvvSuspicious ? "BRUTE_FORCE" : null;
+                string? capturedFraudReason = isCvvSuspicious ? "3 kez üst üste hatalı CVV denemesi yapılmıştır." : null;
 
                 if (input.TransactionType == TransactionTypeEnum.Refund) 
                 {
@@ -307,15 +319,18 @@ namespace FraudGuard.Domain.Services
                     await _cacheProvider.RemoveAsync(cacheKey);
                     await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
 
-                    var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
-                    triggeredRuleCode = evaluationResult.RuleCode;
-                    capturedFraudReason = evaluationResult.FraudReason;
-                    
-                    isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
-                    result.Status = isSuspicious ? "Suspicious" : "Approved";
-                    if (isSuspicious)
+                    if (!isCvvSuspicious)
                     {
-                        result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
+                        triggeredRuleCode = evaluationResult.RuleCode;
+                        capturedFraudReason = evaluationResult.FraudReason;
+                        
+                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
+                        result.Status = isSuspicious ? "Suspicious" : "Approved";
+                        if (isSuspicious)
+                        {
+                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                        }
                     }
                 }
                 else if (input.TransactionType == TransactionTypeEnum.Sale)
@@ -323,14 +338,14 @@ namespace FraudGuard.Domain.Services
                     bool isInitialDecline = result.Status == "Declined";
 
                     decimal availableFunds = isCredit ? creditCard.AvailableLimit : debitCard.Balance;
-                    if (!isInitialDecline && availableFunds < processedAmount)
+                    if (!isInitialDecline && !isCvvSuspicious && availableFunds < processedAmount)
                     {
                         result.Status = "Declined";
                         result.DeclineReason = "Yetersiz Bakiye";
                         isInitialDecline = true;
                     }
 
-                    if (!isBlocked)
+                    if (!isBlocked && !isCvvSuspicious && !isInitialDecline)
                     {
                         var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
                         

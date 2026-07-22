@@ -45,6 +45,8 @@ function Dashboard() {
             { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
             { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
             { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
+            { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İptal/İade (High Value Refund)' },
+            { value: 'LATE_VOID', label: 'Gecikmiş İptal Kuralı (Late Void)' },
             { value: 'ACCOUNT_DRAIN', label: 'Hesap Boşaltma (Account Drain)' },
             { value: 'SMURFING', label: 'Dilimleme (Smurfing)' },
             { value: 'WALLET_CASHOUT', label: 'Wallet Cash-Out' },
@@ -53,7 +55,8 @@ function Dashboard() {
             { value: 'NEW_BENEFICIARY_TRANSFER', label: 'Yeni Alıcı Transferi' },
             { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
             { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
-            { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' }
+            { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' },
+            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderim (Multi-Sender)' }
         ],
         CREDIT_CARD: [
             { value: 'BRUTE_FORCE', label: 'Ardışık Red (Brute Force)' },
@@ -65,7 +68,9 @@ function Dashboard() {
             { value: 'CURRENCY_MISMATCH', label: 'Para Birimi Sapması (Currency)' },
             { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
             { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
-            { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' }
+            { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
+            { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İptal/İade (High Value Refund)' },
+            { value: 'LATE_VOID', label: 'Gecikmiş İptal Kuralı (Late Void)' }
         ],
         DEBIT_CARD: [
             { value: 'ACCOUNT_DRAIN', label: 'Hesap Boşaltma (Account Drain)' },
@@ -77,7 +82,9 @@ function Dashboard() {
             { value: 'CURRENCY_MISMATCH', label: 'Para Birimi Sapması (Currency)' },
             { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
             { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
-            { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' }
+            { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
+            { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İptal/İade (High Value Refund)' },
+            { value: 'LATE_VOID', label: 'Gecikmiş İptal Kuralı (Late Void)' }
         ],
         BANK_TRANSFER: [
             { value: 'SMURFING', label: 'Dilimleme (Smurfing)' },
@@ -87,7 +94,8 @@ function Dashboard() {
             { value: 'NEW_BENEFICIARY_TRANSFER', label: 'Yeni Alıcı Transferi' },
             { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
             { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
-            { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' }
+            { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' },
+            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderim (Multi-Sender)' }
         ]
     };
 
