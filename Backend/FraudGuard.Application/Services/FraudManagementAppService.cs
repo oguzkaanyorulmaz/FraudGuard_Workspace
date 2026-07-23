@@ -20,13 +20,15 @@ namespace FraudGuard.Application.Services
         private readonly IMapper _mapper;
         private readonly IFraudLogRepository _fraudLogRepository;
         private readonly ITransactionRepository _transactionRepository;
+        private readonly IDebitCardRepository _debitCardRepository;
 
-        public FraudManagementAppService(IAdminOperationService adminOperationService, IMapper mapper, IFraudLogRepository fraudLogRepository, ITransactionRepository transactionRepository)
+        public FraudManagementAppService(IAdminOperationService adminOperationService, IMapper mapper, IFraudLogRepository fraudLogRepository, ITransactionRepository transactionRepository, IDebitCardRepository debitCardRepository)
         {
             _adminOperationService = adminOperationService;
             _mapper = mapper;
             _fraudLogRepository = fraudLogRepository;
             _transactionRepository = transactionRepository;
+            _debitCardRepository = debitCardRepository;
         }
 
         public async Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetUnresolvedLogsAsync()
@@ -109,6 +111,68 @@ namespace FraudGuard.Application.Services
             var customer = creditCard?.Customer ?? debitCard?.Customer;
             var isCardSuspicious = await _transactionRepository.HasAnySuspiciousTransactionAsync(targetCardId, isCredit);
 
+            // Transfer geçmişi: Hesabın IBAN'ı üzerinden gönderilen ve alınan EFT/Havale işlemleri
+            var sentTransferList = new List<ETransferTransaction>();
+            var receivedTransferList = new List<ETransferTransaction>();
+            string? accountIBAN = null;
+            
+            if (logEntity.TransferTransactionId.HasValue)
+            {
+                // Transfer tipi log: SenderIBAN'dan hesap IBAN'ını al
+                accountIBAN = logEntity.Transaction?.SenderIBAN;
+                if (!string.IsNullOrEmpty(accountIBAN))
+                {
+                    var senderDebit = await _debitCardRepository.GetByIBANAsync(accountIBAN);
+                    if (senderDebit != null)
+                    {
+                        customer = customer ?? senderDebit.Customer;
+                    }
+                }
+            }
+            else if (debitCard != null)
+            {
+                // Banka kartı tipi log: DebitCard'ın IBAN'ını kullan
+                accountIBAN = debitCard.IBAN;
+            }
+            
+            if (!string.IsNullOrEmpty(accountIBAN))
+            {
+                sentTransferList = await _transactionRepository.GetLast10SentTransfersForIBANAsync(accountIBAN, activeTxDate);
+                receivedTransferList = await _transactionRepository.GetLast10ReceivedTransfersForIBANAsync(accountIBAN, activeTxDate);
+            }
+
+            // Transfer DTO mapper helper
+            CardRecentTransactionDto MapTransferToDto(ETransferTransaction t) => new CardRecentTransactionDto
+            {
+                Amount = t.Amount,
+                Currency = t.Currency,
+                Location = t.Location,
+                Country = t.Country,
+                TransactionTypeName = "Transfer İşlemi",
+                TransactionDate = t.TransactionDate,
+                MerchantCategory = t.MerchantCategory,
+                Status = t.Status,
+                FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                DeclineReason = t.DeclineReason,
+                PaymentTypeCode = t.PaymentType.ToString(),
+                SenderIBAN = t.SenderIBAN,
+                ReceiverIBAN = t.ReceiverIBAN,
+                ReceiverName = t.ReceiverName,
+                Description = t.Description
+            };
+
+            // Transfer tipi loglar için "Tüm İşlemler" kart listesi boş olacağından, transferlerle dolduralım
+            if (logEntity.TransferTransactionId.HasValue && recentTxList.Count == 0)
+            {
+                var allTransfers = sentTransferList.Concat(receivedTransferList)
+                    .OrderByDescending(t => t.TransactionDate)
+                    .Take(10)
+                    .ToList();
+                recentTxList = allTransfers.Cast<ITransaction>().ToList();
+            }
+
             var detail = new GetFraudLogDetailResponse
             {
                 IsCardSuspicious = isCardSuspicious,
@@ -119,9 +183,11 @@ namespace FraudGuard.Application.Services
                 TransactionDate = logEntity.Transaction?.TransactionDate ?? System.DateTime.Now,
                 Location = logEntity.Transaction?.Location ?? "Bilinmiyor",
                 Country = logEntity.Transaction?.Country ?? "Bilinmiyor",
-                TransactionTypeName = isCredit 
-                    ? (logEntity.CreditCardTransaction?.TransactionType?.Description ?? "Bilinmeyen") 
-                    : (logEntity.DebitCardTransaction?.TransactionType?.Description ?? "Bilinmeyen"),
+                TransactionTypeName = logEntity.CreditCardTransaction != null 
+                    ? (logEntity.CreditCardTransaction.TransactionType?.Description ?? "Satış İşlemi") 
+                    : logEntity.DebitCardTransaction != null 
+                        ? (logEntity.DebitCardTransaction.TransactionType?.Description ?? "Satış İşlemi") 
+                        : "Transfer İşlemi",
                 
                 MaskedCardNumber = creditCard?.CardNumber ?? debitCard?.CardNumber ?? logEntity.Transaction?.SenderIBAN ?? "Bilinmiyor", 
                 CardLimit = creditCard?.CardLimit ?? 0,
@@ -131,6 +197,12 @@ namespace FraudGuard.Application.Services
                 ResolvedByAdmin = logEntity.ResolvedByAdmin,
                 AdminAction = logEntity.AdminAction,
                 
+                SenderIBAN = logEntity.Transaction?.SenderIBAN ?? debitCard?.IBAN,
+                ReceiverIBAN = logEntity.Transaction?.ReceiverIBAN,
+                ReceiverName = logEntity.Transaction?.ReceiverName,
+                Description = logEntity.Transaction?.Description,
+                PaymentTypeCode = logEntity.Transaction?.PaymentType.ToString(),
+
                 CustomerFullName = customer != null ? $"{customer.FirstName} {customer.LastName}" : "Bilinmeyen Müşteri",
                 IdentityNumber = customer?.IdentityNumber ?? "Bilinmiyor",
                 PhoneNumber = customer?.PhoneNumber ?? "Bilinmiyor", 
@@ -155,7 +227,11 @@ namespace FraudGuard.Application.Services
                     
                     ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
                     DeclineReason = t.DeclineReason,
-                    PaymentTypeCode = t.PaymentType.ToString()
+                    PaymentTypeCode = t.PaymentType.ToString(),
+                    SenderIBAN = t.SenderIBAN,
+                    ReceiverIBAN = t.ReceiverIBAN,
+                    ReceiverName = t.ReceiverName,
+                    Description = t.Description
                 }).ToList(),
                 RecentSuspiciousTransactions = recentSuspiciousTxList.Select(t => new CardRecentTransactionDto
                 {
@@ -173,8 +249,14 @@ namespace FraudGuard.Application.Services
                     
                     ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
                     DeclineReason = t.DeclineReason,
-                    PaymentTypeCode = t.PaymentType.ToString()
-                }).ToList()
+                    PaymentTypeCode = t.PaymentType.ToString(),
+                    SenderIBAN = t.SenderIBAN,
+                    ReceiverIBAN = t.ReceiverIBAN,
+                    ReceiverName = t.ReceiverName,
+                    Description = t.Description
+                }).ToList(),
+                RecentSentTransfers = sentTransferList.Select(MapTransferToDto).ToList(),
+                RecentReceivedTransfers = receivedTransferList.Select(MapTransferToDto).ToList()
             };
 
             if (callerRole != UserRoleEnum.Admin)
@@ -182,6 +264,8 @@ namespace FraudGuard.Application.Services
                 detail.MaskedCardNumber = detail.MaskedCardNumber.MaskCardNumber();
                 detail.IdentityNumber = detail.IdentityNumber.MaskIdentityNumber();
                 detail.PhoneNumber = detail.PhoneNumber.MaskPhoneNumber();
+                if (!string.IsNullOrEmpty(detail.SenderIBAN)) detail.SenderIBAN = detail.SenderIBAN.MaskCardNumber();
+                if (!string.IsNullOrEmpty(detail.ReceiverIBAN)) detail.ReceiverIBAN = detail.ReceiverIBAN.MaskCardNumber();
             }
 
             return ResponseDTO<GetFraudLogDetailResponse>.Success(detail);

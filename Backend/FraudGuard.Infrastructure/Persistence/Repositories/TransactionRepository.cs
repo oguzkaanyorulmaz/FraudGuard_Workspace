@@ -180,6 +180,28 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<ETransferTransaction>> GetLast10SentTransfersForIBANAsync(string iban, DateTime beforeDate)
+        {
+            return await _context.TransferTransactions
+                .Include(t => t.FraudLog)
+                    .ThenInclude(fl => fl.FraudRule)
+                .Where(t => t.SenderIBAN == iban && t.TransactionDate < beforeDate)
+                .OrderByDescending(t => t.TransactionDate)
+                .Take(10)
+                .ToListAsync();
+        }
+
+        public async Task<List<ETransferTransaction>> GetLast10ReceivedTransfersForIBANAsync(string iban, DateTime beforeDate)
+        {
+            return await _context.TransferTransactions
+                .Include(t => t.FraudLog)
+                    .ThenInclude(fl => fl.FraudRule)
+                .Where(t => t.ReceiverIBAN == iban && t.TransactionDate < beforeDate)
+                .OrderByDescending(t => t.TransactionDate)
+                .Take(10)
+                .ToListAsync();
+        }
+
         public async Task<ECreditCardTransaction?> GetCreditCardByIdAsync(int id)
         {
             return await _context.CreditCardTransactions

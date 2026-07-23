@@ -26,6 +26,8 @@ namespace FraudGuard.Domain.Interfaces.Repositories
         // Transfer bazlı sorgular
         Task<List<ETransferTransaction>> GetRecentTransferTransactionsByReceiverIBANAsync(string receiverIBAN, TimeSpan timeWindow);
         Task<List<ETransferTransaction>> GetRecentTransferTransactionsBySenderIBANAsync(string senderIBAN, TimeSpan timeWindow);
+        Task<List<ETransferTransaction>> GetLast10SentTransfersForIBANAsync(string iban, DateTime beforeDate);
+        Task<List<ETransferTransaction>> GetLast10ReceivedTransfersForIBANAsync(string iban, DateTime beforeDate);
 
         // Tekil sorgulamalar
         Task<ECreditCardTransaction?> GetCreditCardByIdAsync(int id);

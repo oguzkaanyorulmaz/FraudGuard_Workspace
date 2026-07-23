@@ -95,7 +95,8 @@ function Dashboard() {
             { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
             { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
             { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' },
-            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderim (Multi-Sender)' }
+            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderim (Multi-Sender)' },
+            { value: 'ANOMALOUS_TIME', label: 'Gece Sıradışı Tutar (Anomalous Time)' }
         ]
     };
 

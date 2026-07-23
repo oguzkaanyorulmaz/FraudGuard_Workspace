@@ -32,8 +32,16 @@ namespace FraudGuard.Domain.Services.Rules
                 var receiverDebit = await _debitCardRepository.GetByIBANAsync(input.ReceiverIBAN);
                 if (receiverDebit != null)
                 {
-                    var receiverRecentTx = await _transactionRepository.GetRecentTransactionsAsync(receiverDebit.CardId, isCreditCard: false, TimeSpan.FromDays(30));
-                    bool isPassiveAccount = !receiverRecentTx.Any(t => t.Status == "Approved");
+                    var cardRecentTxs = await _transactionRepository.GetRecentTransactionsAsync(receiverDebit.CardId, isCreditCard: false, TimeSpan.FromDays(30));
+                    var incomingTransfers = await _transactionRepository.GetRecentTransferTransactionsByReceiverIBANAsync(receiverDebit.IBAN, TimeSpan.FromDays(30));
+                    var outgoingTransfers = await _transactionRepository.GetRecentTransferTransactionsBySenderIBANAsync(receiverDebit.IBAN, TimeSpan.FromDays(30));
+
+                    bool hasCardActivity = cardRecentTxs.Any(t => t.Status == "Approved");
+                    bool hasIncomingActivity = incomingTransfers.Any(t => t.Status == "Approved");
+                    bool hasOutgoingActivity = outgoingTransfers.Any(t => t.Status == "Approved");
+
+                    bool isPassiveAccount = !hasCardActivity && !hasIncomingActivity && !hasOutgoingActivity;
+
                     if (isPassiveAccount && input.Amount >= 5000)
                     {
                         return (true, $"Alıcı hesap ({input.ReceiverIBAN}) son 30 gündür pasif olmasına rağmen ani ve yüksek tutarlı (>= 5.000 TL) transfer gelmektedir.");

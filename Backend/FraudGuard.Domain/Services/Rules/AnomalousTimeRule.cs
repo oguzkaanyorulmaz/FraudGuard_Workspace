@@ -15,7 +15,9 @@ namespace FraudGuard.Domain.Services.Rules
 
         public Task<(bool IsSuspicious, string? Reason)> EvaluateAsync(ProcessTransactionInput input, List<ITransaction> history)
         {
-            int currentHour = DateTime.Now.Hour;
+            var turkeyZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul");
+var turkeyTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, turkeyZone);
+int currentHour = turkeyTime.Hour; 
             if (currentHour >= 2 && currentHour <= 5 && input.Amount >= 100000)
             {
                 return Task.FromResult((true, (string?)"Gece 02:00 - 05:00 saatleri arasında 100.000 TL ve üzeri yüksek tutarlı harcama/transfer denemesi."));

@@ -23,12 +23,19 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public decimal AvailableLimit { get; set; }
         public bool IsCardBlocked { get; set; }
         public bool IsCardSuspicious { get; set; }
+        public string? SenderIBAN { get; set; }
+        public string? ReceiverIBAN { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? Description { get; set; }
+        public string? PaymentTypeCode { get; set; }
 
         public string CustomerFullName { get; set; }
         public string IdentityNumber { get; set; }
         public string? PhoneNumber { get; set; }
         public List<CardRecentTransactionDto> RecentTransactions { get; set; } = new();
         public List<CardRecentTransactionDto> RecentSuspiciousTransactions { get; set; } = new();
+        public List<CardRecentTransactionDto> RecentSentTransfers { get; set; } = new();
+        public List<CardRecentTransactionDto> RecentReceivedTransfers { get; set; } = new();
         public string? AdminNote { get; set; }
         public string? ResolvedByAdmin { get; set; }
         public string? AdminAction { get; set; }
@@ -49,5 +56,9 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public string? ResolvedByAdmin { get; set; }
         public string? DeclineReason { get; set; }
         public string? PaymentTypeCode { get; set; }
+        public string? SenderIBAN { get; set; }
+        public string? ReceiverIBAN { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? Description { get; set; }
     }
 }

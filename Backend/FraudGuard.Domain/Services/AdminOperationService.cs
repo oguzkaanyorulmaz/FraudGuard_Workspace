@@ -15,6 +15,7 @@ namespace FraudGuard.Domain.Services
         private readonly ICurrencyService _currencyService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ICacheProvider _cacheProvider;
+        private readonly IBankAccountBeneficiaryRepository _bankAccountBeneficiaryRepository;
 
         public AdminOperationService(
             IFraudLogRepository fraudLogRepository,
@@ -22,7 +23,8 @@ namespace FraudGuard.Domain.Services
             IDebitCardRepository debitCardRepository,
             ICurrencyService currencyService,
             IUnitOfWork unitOfWork,
-            ICacheProvider cacheProvider)
+            ICacheProvider cacheProvider,
+            IBankAccountBeneficiaryRepository bankAccountBeneficiaryRepository)
         {
             _fraudLogRepository = fraudLogRepository;
             _creditCardRepository = creditCardRepository;
@@ -30,6 +32,7 @@ namespace FraudGuard.Domain.Services
             _currencyService = currencyService;
             _unitOfWork = unitOfWork;
             _cacheProvider = cacheProvider;
+            _bankAccountBeneficiaryRepository = bankAccountBeneficiaryRepository;
         }
 
         public async Task<List<EFraudLog>> GetUnresolvedLogsAsync()
@@ -66,6 +69,26 @@ public async Task<bool> ResolveFraudLogAsync(
                     {
                         receiverDebit.Balance += convertedAmount;
                         await _debitCardRepository.UpdateAsync(receiverDebit);
+                    }
+
+                    if (!string.IsNullOrEmpty(log.Transaction.SenderIBAN))
+                    {
+                        var senderDebit = await _debitCardRepository.GetByIBANAsync(log.Transaction.SenderIBAN);
+                        if (senderDebit != null)
+                        {
+                            bool hasBeneficiary = await _bankAccountBeneficiaryRepository.AnyAsync(senderDebit.CustomerId, log.Transaction.ReceiverIBAN);
+                            if (!hasBeneficiary)
+                            {
+                                var beneficiary = new EBankAccountBeneficiary
+                                {
+                                    CustomerId = senderDebit.CustomerId,
+                                    ReceiverIBAN = log.Transaction.ReceiverIBAN,
+                                    ReceiverName = log.Transaction.ReceiverName ?? "Alıcı",
+                                    AddedDate = System.DateTime.Now
+                                };
+                                await _bankAccountBeneficiaryRepository.AddAsync(beneficiary);
+                            }
+                        }
                     }
                 }
             }
@@ -111,6 +134,24 @@ public async Task<bool> ResolveFraudLogAsync(
                         await _debitCardRepository.UpdateAsync(debitCard);
                     }
                 }
+                else if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.SenderIBAN))
+                {
+                    var debitCard = await _debitCardRepository.GetByIBANAsync(log.Transaction.SenderIBAN);
+                    if (debitCard != null)
+                    {
+                        if (isRefundReversal)
+                        {
+                            debitCard.Balance = Math.Max(0, debitCard.Balance - convertedAmount);
+                        }
+                        else
+                        {
+                            debitCard.Balance += convertedAmount;
+                        }
+                        debitCard.IsBlocked = true;
+                        debitCard.BlockReasonId = blockReasonId;
+                        await _debitCardRepository.UpdateAsync(debitCard);
+                    }
+                }
             }
         }
 
@@ -126,6 +167,14 @@ public async Task<bool> ResolveFraudLogAsync(
             if (log.Transaction is EDebitCardTransaction dcTx && dcTx.DebitCard != null)
             {
                 await _cacheProvider.RemoveAsync($"card_info_{dcTx.DebitCard.CardNumber}");
+            }
+            if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.SenderIBAN))
+            {
+                var senderDebit = await _debitCardRepository.GetByIBANAsync(log.Transaction.SenderIBAN);
+                if (senderDebit != null)
+                {
+                    await _cacheProvider.RemoveAsync($"card_info_{senderDebit.CardNumber}");
+                }
             }
             if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.ReceiverIBAN))
             {
