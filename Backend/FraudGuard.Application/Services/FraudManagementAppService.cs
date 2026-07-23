@@ -129,6 +129,7 @@ namespace FraudGuard.Application.Services
                 IsCardBlocked = creditCard?.IsBlocked ?? debitCard?.IsBlocked ?? false,
                 AdminNote = logEntity.AdminNote,
                 ResolvedByAdmin = logEntity.ResolvedByAdmin,
+                AdminAction = logEntity.AdminAction,
                 
                 CustomerFullName = customer != null ? $"{customer.FirstName} {customer.LastName}" : "Bilinmeyen Müşteri",
                 IdentityNumber = customer?.IdentityNumber ?? "Bilinmiyor",
@@ -256,11 +257,11 @@ namespace FraudGuard.Application.Services
                 2 => 1.3m, // Sanal POS
                 3 => 1.2m, // ATM
                 1 => 1.0m, // POS
-                4 => 0.85m, // Mobil Şube
-                5 => 0.85m, // İnternet Şubesi
+                4 => 1.0m, // Mobil Şube
+                5 => 0.95m, // İnternet Şubesi
                 _ => 1.0m
             };
-
+ 
             // 3. İşyeri Kategorisi Çarpanı
             decimal categoryFactor = 1.0m;
             if (!string.IsNullOrEmpty(tx.MerchantCategory))
@@ -273,31 +274,36 @@ namespace FraudGuard.Application.Services
                 else if (category.Contains("e-ticaret") || category.Contains("transfer"))
                     categoryFactor = 1.1m;
                 else if (category.Contains("market") || category.Contains("giyim") || category.Contains("restoran") || category.Contains("yemek"))
-                    categoryFactor = 0.8m;
+                    categoryFactor = 0.9m;
             }
-
+ 
             // 4. İşlem Tipi Çarpanı
             decimal typeFactor = tx.TransactionTypeId switch
             {
                 2 => 1.2m, // Refund (İade)
-                3 => 0.7m, // Void (İptal)
                 _ => 1.0m  // Sale / Transfer
             };
-
+ 
             // 5. Para Birimi Çarpanı
             decimal currencyFactor = (!string.IsNullOrEmpty(tx.Currency) && tx.Currency != "TRY") ? 1.2m : 1.0m;
-
+ 
             // 6. Konum/Ülke Çarpanı
             decimal countryFactor = (!string.IsNullOrEmpty(tx.Country) && tx.Country.ToLower() != "türkiye") ? 1.3m : 1.0m;
-
-            // Katsayıların Bileşkesi
+ 
+            // Katsayıların Bileşkesi (Cap & Floor Kuralları ile)
             decimal combinedFactor = channelFactor * categoryFactor * typeFactor * currencyFactor * countryFactor;
-
+            combinedFactor = System.Math.Min(combinedFactor, 1.5m); // Tavan sınırı (Cap)
+            
+            if (ruleWeight >= 80)
+            {
+                combinedFactor = System.Math.Max(combinedFactor, 1.0m); // Kritik kurallar için taban sınırı (Floor)
+            }
+ 
             // 7. Bakiye / Limit Oranı Hesaplama
             decimal limitOranEtkisi = 0;
             decimal cardLimit = 0;
             decimal availableLimit = 0;
-
+ 
             if (tx is ECreditCardTransaction ccTx && ccTx.CreditCard != null)
             {
                 cardLimit = ccTx.CreditCard.CardLimit;
@@ -308,7 +314,7 @@ namespace FraudGuard.Application.Services
                 cardLimit = 100000; // Varsayılan limit eşiği
                 availableLimit = dcTx.DebitCard.Balance;
             }
-
+ 
             if (cardLimit > 0)
             {
                 decimal spentLimit = System.Math.Max(0, cardLimit - availableLimit);
@@ -317,16 +323,17 @@ namespace FraudGuard.Application.Services
                 limitOranEtkisi = (txRatio * 0.6m) + (spentRatio * 0.4m);
                 if (limitOranEtkisi > 100) limitOranEtkisi = 100;
             }
-
+ 
             // Hacim Skoru (Tek işlem tutarının büyüklüğü)
             decimal volumeScore = System.Math.Min((tx.Amount / 50000m) * 100m, 100m);
-
+ 
             // Dinamik Faktör (%50 Limit Kullanım Oranı + %50 İşlem Hacmi)
             decimal dynamicFactor = ((limitOranEtkisi * 0.5m) + (volumeScore * 0.5m)) / 100m;
-
-            // Risk Skoru Hesaplama
-            decimal rawScore = (ruleWeight * combinedFactor) + (100m - ruleWeight) * dynamicFactor;
-
+ 
+            // Risk Skoru Hesaplama (Dinamik faktör katkısı 35 puan ile sınırlandırılmıştır)
+            decimal dynamicWeight = System.Math.Min(100m - ruleWeight, 35m);
+            decimal rawScore = (ruleWeight * combinedFactor) + (dynamicWeight * dynamicFactor);
+ 
             int finalScore = (int)System.Math.Round(rawScore);
             return System.Math.Clamp(finalScore, 1, 100);
         }

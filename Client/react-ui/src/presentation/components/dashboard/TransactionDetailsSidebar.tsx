@@ -11,16 +11,13 @@ interface Props {
 export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen, onClose }) => {
     console.log("TransactionDetailsSidebar rendered, isOpen:", isOpen, "txnId:", transaction?.id);
     
-    // C# API'den gelecek detay verilerini tutacağımız state
     const [detail, setDetail] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [historyTab, setHistoryTab] = useState<'all' | 'suspicious'>('all');
     const { user } = useAuth();
 
-    // Kart geçmişinde genişletilen işlemin indeksini tutar
     const [expandedTxId, setExpandedTxId] = useState<number | null>(null);
 
-    // Geçiş Yumuşatma (Transition) Durumları
     const [shouldRender, setShouldRender] = useState(isOpen);
     const [animate, setAnimate] = useState(false);
     const [localTxn, setLocalTxn] = useState<Transaction | null>(null);
@@ -28,7 +25,7 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
     useEffect(() => {
         if (isOpen) {
             setShouldRender(true);
-            setExpandedTxId(null); // Panel açıldığında genişletilen satırı sıfırla
+            setExpandedTxId(null);
             if (transaction) setLocalTxn(transaction);
             const timer = setTimeout(() => {
                 setAnimate(true);
@@ -69,11 +66,9 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
 
     if (!shouldRender || !localTxn) return null;
 
-    // Skor hesaplaması
     const scoreValue = localTxn.riskScore ?? 0;
     const isHighRisk = scoreValue >= 70;
 
-    // Kart numarasını gruplama helper'ı
     const formatCardNumber = (num: string) => {
         if (!num) return '';
         const clean = num.replace(/\s+/g, '');
@@ -83,7 +78,6 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
         return num;
     };
 
-    // Telefon numarasını Türkiye standart formatında (+90 555 555 55 55) yazma helper'ı
     const formatPhoneNumber = (phone: string) => {
         if (!phone) return 'Kayıt Yok';
         let clean = phone.replace(/\D/g, '');
@@ -100,6 +94,13 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
         }
         return phone;
     };
+
+    const isSafeAction = detail && (
+        detail.adminAction === 'MarkAsSafe' ||
+        detail.adminAction === 'APPROVE' ||
+        detail.adminAction === 'Approve' ||
+        detail.adminAction === 'APPROVED'
+    );
 
     return (
         <>
@@ -146,12 +147,12 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
 
                     {/* Çözümlenmiş işlem ise Analiz Kararı ve Analist bilgisi (Daha Belirgin Tasarım) */}
                     {detail && detail.adminNote && (
-                        <div className="bg-emerald-50 border-2 border-emerald-300 p-5 rounded-xl text-xs text-emerald-950 mb-6 flex flex-col gap-2.5 shadow-sm">
-                            <div className="font-bold flex items-center gap-1.5 text-emerald-800 uppercase tracking-wider text-xs border-b border-emerald-200 pb-1.5">
+                        <div className={`border-2 p-5 rounded-xl text-xs mb-6 flex flex-col gap-2.5 shadow-sm ${isSafeAction ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-red-50 border-red-300 text-red-950'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 uppercase tracking-wider text-xs border-b pb-1.5 ${isSafeAction ? 'text-emerald-800 border-emerald-200' : 'text-red-800 border-red-200'}`}>
                                 📋 Analiz Kararı
                             </div>
                             <div className="font-bold text-slate-800 text-sm">
-                                Alınan Aksiyon: <span className="font-bold text-emerald-700 bg-emerald-100/50 px-2 py-0.5 rounded-full">{detail.adminAction === 'MarkAsSafe' ? 'Güvenli İşlem' : 'Blokeli İşlem'}</span>
+                                Alınan Aksiyon: <span className={`font-bold px-2 py-0.5 rounded-full ${isSafeAction ? 'text-emerald-700 bg-emerald-100/50' : 'text-red-700 bg-red-100/50'}`}>{isSafeAction ? 'Güvenli İşlem' : 'Blokeli İşlem'}</span>
                             </div>
                             <div className="font-bold text-slate-800 text-sm">
                                 Gerekçe: <span className="font-normal text-slate-700">{detail.adminNote}</span>
@@ -365,7 +366,7 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                                 {isExpanded && (
                                                     <div 
                                                         className="mt-3 pt-3 border-t border-dashed border-slate-200 text-xs text-[#1A1D20] space-y-3"
-                                                        onClick={(e) => e.stopPropagation()} // tıklamaların kapatmasını engelle
+                                                        onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-1.5 rounded-xl">
                                                             {/* Kart No */}

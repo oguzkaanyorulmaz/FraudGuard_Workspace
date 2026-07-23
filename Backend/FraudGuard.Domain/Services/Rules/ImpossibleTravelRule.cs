@@ -26,7 +26,7 @@ namespace FraudGuard.Domain.Services.Rules
             {
                 var lastTx = history
                     .OrderByDescending(t => t.TransactionDate)
-                    .FirstOrDefault(t => t.Status == "Approved" || t.Status == "Refund" || t.Status == "Void");
+                    .FirstOrDefault(t => t.Status == "Approved" || t.Status == "Refund");
 
                 if (lastTx != null && !string.IsNullOrEmpty(lastTx.Location) && !string.IsNullOrEmpty(input.Location) && lastTx.Location != input.Location)
                 {

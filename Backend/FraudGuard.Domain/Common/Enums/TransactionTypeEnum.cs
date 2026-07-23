@@ -3,7 +3,6 @@ namespace FraudGuard.Domain.Common.Enums
     public enum TransactionTypeEnum
     {
         Sale = 1,
-        Refund = 2,
-        Void = 3
+        Refund = 2
     }
 }

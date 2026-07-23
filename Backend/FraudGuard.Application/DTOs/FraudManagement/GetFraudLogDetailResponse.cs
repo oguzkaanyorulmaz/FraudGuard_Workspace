@@ -31,6 +31,7 @@ namespace FraudGuard.Application.DTOs.FraudManagement
         public List<CardRecentTransactionDto> RecentSuspiciousTransactions { get; set; } = new();
         public string? AdminNote { get; set; }
         public string? ResolvedByAdmin { get; set; }
+        public string? AdminAction { get; set; }
     }
 
     public class CardRecentTransactionDto

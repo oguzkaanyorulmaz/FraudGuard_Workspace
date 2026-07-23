@@ -63,8 +63,7 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
                 new EFraudRule { RuleId = 18, RuleCode = "HIGH_RISK_RECEIVER", RuleName = "Şüpheli Alıcı/Katır Hesap", Description = "Gönderilen IBAN'ın sistemde kara listede olması", IsActive = true },
                 new EFraudRule { RuleId = 19, RuleCode = "MULTI_SENDER_TO_SINGLE_RECEIVER", RuleName = "Tek Alıcıya Çoklu Gönderim", Description = "Aynı alıcıya kısa sürede farklı kişilerden para transferi", IsActive = true },
                 new EFraudRule { RuleId = 20, RuleCode = "RECEIVER_BALANCE_ANOMALY", RuleName = "Katır Hesap Bakiye Sapması", Description = "Pasif hesaba ani bakiye gelip 1 saatte nakit çekilmeye çalışılması", IsActive = true },
-                new EFraudRule { RuleId = 21, RuleCode = "LATE_VOID", RuleName = "Gecikmiş İptal Kuralı", Description = "Orijinal işlem tarihinden 2 saatten fazla süre geçtikten sonra iptal (Void) işlemi yapılmaya çalışılması", IsActive = true },
-                new EFraudRule { RuleId = 22, RuleCode = "HIGH_VALUE_REFUND_VOID", RuleName = "Yüksek Tutarlı İptal/İade Kuralı", Description = "Tek seferde 10.000 TL ve üzerinde İade (Refund) ya da İptal (Void) işlemi yapılması", IsActive = true }
+                new EFraudRule { RuleId = 22, RuleCode = "HIGH_VALUE_REFUND_VOID", RuleName = "Yüksek Tutarlı İade Kuralı", Description = "Tek seferde 10.000 TL ve üzerinde İade (Refund) işlemi yapılması", IsActive = true }
             );
 
             // 3. Block Reasons Seeding
