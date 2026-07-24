@@ -9,7 +9,6 @@ interface Props {
 }
 
 export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen, onClose }) => {
-    console.log("TransactionDetailsSidebar rendered, isOpen:", isOpen, "txnId:", transaction?.id);
 
     const [detail, setDetail] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -46,7 +45,8 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
             setHistoryTab('all');
             const token = user?.token || '';
 
-            fetch(`http://localhost:5217/api/FraudManagement/log-detail/${localTxn.id}`, {
+            const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+            fetch(`http://${host}:5217/api/FraudManagement/log-detail/${localTxn.id}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -115,24 +115,37 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
         <>
             {/* Arka plan karartması */}
             <div
-                className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 ${animate ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                    }`}
+                className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${
+                    animate ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                }`}
                 onClick={onClose}
             ></div>
 
-            {/* Yan Panel */}
+            {/* Modal Gövdesi */}
             <div
-                className={`fixed inset-y-0 right-0 w-full md:w-[800px] bg-white border-l border-[#E4E7EB] shadow-2xl z-50 transition-transform duration-300 ease-out flex flex-col ${animate ? 'translate-x-0' : 'translate-x-full'
-                    }`}
+                className={`fixed z-50 bg-white shadow-2xl flex flex-col border border-[#E4E7EB] overflow-x-hidden transition-all duration-300 transform
+                    top-[4vh] bottom-[4vh] left-[4vw] right-[4vw] rounded-2xl
+                    lg:top-0 lg:bottom-0 lg:left-auto lg:right-0 lg:h-full lg:w-[600px] lg:rounded-none lg:border-l lg:border-y-0
+                    ${
+                        animate 
+                            ? 'opacity-100 scale-100 translate-y-0 lg:translate-x-0' 
+                            : 'opacity-0 scale-95 translate-y-4 pointer-events-none lg:translate-x-full lg:opacity-100 lg:scale-100 lg:translate-y-0'
+                    }
+                `}
             >
-                <div className="flex justify-between items-center p-3 md:p-5 border-b border-[#E4E7EB]">
+                <div className="flex justify-between items-center p-4 border-b border-[#E4E7EB]">
                     <h2 className="text-base md:text-lg font-bold text-[#111] flex items-center gap-2">
-                        🔍 <span className="hidden md:inline">Detaylı Analiz Paneli</span><span className="md:hidden">Analiz</span>
+                        🔍 Detaylı Analiz Paneli
                     </h2>
-                    <button onClick={onClose} className="text-[#718096] hover:text-[#111] font-bold text-xl cursor-pointer">&times;</button>
+                    <button 
+                        onClick={onClose} 
+                        className="text-slate-600 hover:text-black bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 select-none border border-[#E4E7EB]"
+                    >
+                        ❌ Kapat
+                    </button>
                 </div>
 
-                <div className="p-3 md:p-6 flex-1 overflow-y-auto">
+                <div className="p-4 flex-1 overflow-y-auto">
 
                     {/* Şüphe Sebebi ve Tetiklenen Kural (Daha Belirgin Tasarım) */}
                     <div className="bg-amber-50 border-2 border-amber-300 p-5 rounded-xl text-xs text-amber-950 mb-6 flex flex-col gap-2.5 shadow-sm">
@@ -199,7 +212,7 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                 <div className="space-y-4">
                                     {/* Kart/Hesap & İşlem ID Bilgileri */}
                                     {isTransfer ? (
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div className="bg-white p-3.5 rounded-lg border border-[#E4E7EB] col-span-2">
                                                 <span className="text-xs text-[#718096] font-bold uppercase tracking-wider block mb-1">Gönderen IBAN</span>
                                                 <span className="font-mono text-[#111] font-semibold text-sm">{formatIBAN(detail.senderIBAN)}</span>
@@ -224,7 +237,7 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                             )}
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div className="bg-white p-3.5 rounded-lg border border-[#E4E7EB]">
                                                 <span className="text-xs text-[#718096] font-bold uppercase tracking-wider block mb-1">Kart Numarası</span>
                                                 <span className="font-mono text-[#111] font-semibold text-sm">{formatCardNumber(detail.maskedCardNumber)}</span>
@@ -240,7 +253,7 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                     <h3 className="text-[#111] font-bold text-sm uppercase tracking-wider mt-6 mb-3 border-b border-[#E4E7EB] pb-2">
                                         {isTransfer ? 'Müşteri & Hesap İstihbaratı' : 'Müşteri & Kart İstihbaratı'}
                                     </h3>
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div className="bg-white p-3.5 rounded-lg border border-[#E4E7EB]">
                                             <span className="text-xs text-[#718096] font-bold uppercase tracking-wider block mb-1">Müşteri Adı</span>
                                             <span className="text-sm font-semibold text-[#1A1D20]">{detail.customerFullName}</span>
@@ -284,7 +297,7 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
 
                                     {/* Konum İstihbaratı */}
                                     <h3 className="text-[#111] font-bold text-sm uppercase tracking-wider mt-6 mb-3 border-b border-[#E4E7EB] pb-2">Konum İstihbaratı</h3>
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div className="bg-white p-3.5 rounded-lg border border-[#E4E7EB]">
                                             <span className="text-xs text-[#718096] font-bold uppercase tracking-wider block mb-1">İşlem Lokasyonu</span>
                                             <span className="text-sm font-semibold text-[#1A1D20]">{detail.location}, {detail.country}</span>
@@ -300,26 +313,26 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                         <h3 className="text-[#111] font-bold text-sm uppercase tracking-wider">
                                             {isTransfer ? 'Hesap / Transfer Geçmişi' : 'Kart Geçmişi'}
                                         </h3>
-                                        <div className="flex gap-2 flex-wrap">
+                                        <div className="flex flex-col lg:flex-row lg:flex-wrap gap-2 w-full select-none">
                                             <button
                                                 type="button"
                                                 onClick={() => { setHistoryTab('all'); setExpandedTxId(null); }}
-                                                className={`px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer ${historyTab === 'all' ? 'bg-[#FFC72C] text-[#111] border-[#FFC72C]' : 'bg-white text-slate-500 border-slate-200 hover:text-[#111] hover:border-[#FFC72C]'}`}
+                                                className={`w-full lg:w-auto px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer flex-shrink-0 ${historyTab === 'all' ? 'bg-[#FFC72C] text-[#111] border-[#FFC72C]' : 'bg-white text-slate-500 border-slate-200 hover:text-[#111] hover:border-[#FFC72C]'}`}
                                             >
                                                 📋 Tüm İşlemler (Son 10)
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => { setHistoryTab('suspicious'); setExpandedTxId(null); }}
-                                                className={`px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer ${historyTab === 'suspicious' ? 'bg-[#FFC72C] text-[#111] border-[#FFC72C]' : 'bg-white text-slate-500 border-slate-200 hover:text-[#111] hover:border-[#FFC72C]'}`}
+                                                className={`w-full lg:w-auto px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer flex-shrink-0 ${historyTab === 'suspicious' ? 'bg-[#FFC72C] text-[#111] border-[#FFC72C]' : 'bg-white text-slate-500 border-slate-200 hover:text-[#111] hover:border-[#FFC72C]'}`}
                                             >
-                                                ⚠️ Şüpheli İşlemler (Son 10)
+                                                ⚠️ Şüpheli (Son 10)
                                             </button>
                                             {detail.paymentTypeCode !== 'CreditCard' && (
                                                 <button
                                                     type="button"
                                                     onClick={() => { setHistoryTab('sent'); setExpandedTxId(null); }}
-                                                    className={`px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer ${historyTab === 'sent' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:text-blue-600 hover:border-blue-600'}`}
+                                                    className={`w-full lg:w-auto px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer flex-shrink-0 ${historyTab === 'sent' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:text-blue-600 hover:border-blue-600'}`}
                                                 >
                                                     📤 Gönderilen (Son 10)
                                                 </button>
@@ -328,7 +341,7 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                                 <button
                                                     type="button"
                                                     onClick={() => { setHistoryTab('received'); setExpandedTxId(null); }}
-                                                    className={`px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer ${historyTab === 'received' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:text-emerald-600 hover:border-emerald-600'}`}
+                                                    className={`w-full lg:w-auto px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer flex-shrink-0 ${historyTab === 'received' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:text-emerald-600 hover:border-emerald-600'}`}
                                                 >
                                                     📥 Alınan (Son 10)
                                                 </button>
@@ -366,62 +379,75 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                                                         const code = tx.paymentTypeCode;
                                                                         if (code === 'CreditCard') {
                                                                             return (
-                                                                                <span className="bg-[#FFC72C] text-[#111] px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm">
-                                                                                    Kredi Kartı
+                                                                                <span className="bg-[#FFC72C] text-[#111] px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm flex-shrink-0">
+                                                                                    <span className="md:hidden">Kart</span>
+                                                                                    <span className="hidden md:inline">Kredi Kartı</span>
                                                                                 </span>
                                                                             );
                                                                         }
                                                                         if (code === 'DebitCard') {
                                                                             return (
-                                                                                <span className="bg-slate-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm">
-                                                                                    Banka Kartı
+                                                                                <span className="bg-slate-700 text-white px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm flex-shrink-0">
+                                                                                    <span className="md:hidden">Kart</span>
+                                                                                    <span className="hidden md:inline">Banka Kartı</span>
                                                                                 </span>
                                                                             );
                                                                         }
                                                                         if (code === 'BankTransfer' || code === 'EFT') {
                                                                             const isOutgoing = tx.senderIBAN === detail.senderIBAN;
                                                                             return (
-                                                                                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm text-white ${isOutgoing ? 'bg-blue-600' : 'bg-emerald-600'}`}>
-                                                                                    {isOutgoing ? 'Gönderilen' : 'Alınan'}
+                                                                                <span className={`px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm text-white flex-shrink-0 ${isOutgoing ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+                                                                                    <span className="md:hidden">{isOutgoing ? 'Giden' : 'Gelen'}</span>
+                                                                                    <span className="hidden md:inline">{isOutgoing ? 'Gönderilen' : 'Alınan'}</span>
                                                                                 </span>
                                                                             );
                                                                         }
                                                                         return (
-                                                                            <span className="bg-[#FFC72C] text-[#111] px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm">
+                                                                            <span className="bg-[#FFC72C] text-[#111] px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm flex-shrink-0">
                                                                                 Kart
                                                                             </span>
                                                                         );
                                                                     })()}
                                                                     <div className="flex flex-col">
-                                                                        <span className="text-sm font-black text-black leading-tight">
+                                                                        <span className="text-sm font-black text-black leading-tight whitespace-nowrap">
                                                                             {tx.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {tx.currency}
                                                                         </span>
-                                                                        <span className="text-xs text-slate-500 font-mono">
+                                                                        <span className="text-xs text-slate-500 font-mono hidden md:inline">
                                                                             {metaInfo}
                                                                         </span>
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-2">
                                                                     {/* Status Badge */}
-                                                                    <span className={`px-2.5 py-0.5 rounded-full border text-xs font-bold inline-flex items-center gap-1 ${tx.status === 'Approved'
+                                                                    <span className={`px-1.5 md:px-2.5 py-0.5 rounded-full border text-xs font-bold inline-flex items-center gap-1 ${tx.status === 'Approved'
                                                                             ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
                                                                             : tx.status === 'Suspicious'
                                                                                 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                                                                                 : 'bg-red-500/10 text-red-600 border-red-500/20'
                                                                         }`}>
-                                                                        {tx.status}
+                                                                        <span className="md:hidden">
+                                                                            {tx.status === 'Approved' ? '✅' : (tx.status === 'Suspicious' ? '⚠️' : '❌')}
+                                                                        </span>
+                                                                        <span className="hidden md:inline">
+                                                                            {tx.status}
+                                                                        </span>
                                                                         {tx.status === 'Approved' && tx.fraudSuspicionReason && (
                                                                             <span
-                                                                                className="text-amber-500 text-xs"
+                                                                                className="text-amber-500 text-xs hidden md:inline"
                                                                                 title={`Daha önce şüpheli olarak işaretlendi. Gerekçe: ${tx.fraudSuspicionReason}`}
                                                                             >
                                                                                 ⚠️
                                                                             </span>
                                                                         )}
                                                                     </span>
-                                                                    <span className="text-xs text-slate-400 font-medium">
-                                                                        {new Date(tx.transactionDate).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                                                                    </span>
+                                                                    <div className="flex flex-col items-end text-right select-none">
+                                                                        <span className="text-[9px] text-slate-500 font-bold leading-none">
+                                                                            {new Date(tx.transactionDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                                                        </span>
+                                                                        <span className="text-xs text-slate-400 font-semibold leading-tight">
+                                                                            {new Date(tx.transactionDate).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
                                                                     <svg
                                                                         className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                                                                         fill="none"
@@ -558,7 +584,11 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                             );
                         })()
                     ) : (
-                        <div className="text-center text-gray-500 py-10">Veri bulunamadı.</div>
+                        <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4">
+                            <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-xl">
+                                <div className="text-center text-gray-500 py-10">Veri bulunamadı.</div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

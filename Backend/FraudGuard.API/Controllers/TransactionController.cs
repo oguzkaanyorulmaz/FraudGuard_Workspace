@@ -61,5 +61,12 @@ namespace FraudGuard.API.Controllers
             }
         }
 
+                [HttpGet("ping")]
+        public IActionResult Ping()
+        {
+            return Ok("pong");
+        }
+
+
     }
 }

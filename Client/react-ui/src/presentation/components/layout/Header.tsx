@@ -15,18 +15,17 @@ export const Header: React.FC = () => {
                             <span className="text-base md:text-xl font-extrabold tracking-tight text-[#111111]">FraudGuard</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 md:gap-3">
+                    <div className="flex items-center gap-1.5 md:gap-3">
                         {user && (
                             <>
-                                <div className="hidden md:flex items-center gap-2 bg-[#111111]/10 text-[#111111] px-4 py-1.5 rounded-lg text-xs font-bold border border-[#111111]/20">
-                                    <span>👤 Kullanıcı: {user.username}</span>
+                                <div className="flex items-center gap-1 md:gap-2 bg-[#111111]/10 text-[#111111] px-2 md:px-4 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold border border-[#111111]/20">
+                                    <span>👤 {user.username}</span>
                                 </div>
                                 <button 
                                     onClick={() => setShowConfirm(true)} 
-                                    className="bg-[#111111] hover:bg-black text-white px-3 md:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-sm"
+                                    className="bg-[#111111] hover:bg-black text-white px-2.5 md:px-4 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition cursor-pointer shadow-sm whitespace-nowrap"
                                 >
-                                    <span className="hidden md:inline">Çıkış Yap</span>
-                                    <span className="md:hidden">🚪</span>
+                                    Çıkış
                                 </button>
                             </>
                         )}

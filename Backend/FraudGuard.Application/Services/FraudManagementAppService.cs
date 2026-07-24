@@ -31,7 +31,7 @@ namespace FraudGuard.Application.Services
             _debitCardRepository = debitCardRepository;
         }
 
-        public async Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetUnresolvedLogsAsync()
+        public async Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetUnresolvedLogsAsync(UserRoleEnum callerRole)
         {
             var logs = await _adminOperationService.GetUnresolvedLogsAsync();
             
@@ -44,8 +44,6 @@ namespace FraudGuard.Application.Services
 
                 item.SuspicionReason = originalLog.Transaction?.FraudReason ?? "Sistem tarafından şüpheli bulundu.";
                 item.AdminAction = originalLog.AdminAction;
-
-
                 item.RuleName = originalLog.FraudRule?.RuleName ?? "Genel Şüpheli İşlem";
 
                 var tx = originalLog.Transaction;
@@ -65,6 +63,11 @@ namespace FraudGuard.Application.Services
                 else
                 {
                     item.RiskScore = 75;
+                }
+
+                if (callerRole == UserRoleEnum.Admin)
+                {
+                    item.MaskedCardNumber = cc?.CardNumber ?? dc?.CardNumber ?? originalLog.Transaction?.SenderIBAN ?? "Bilinmiyor";
                 }
             }
 
@@ -163,15 +166,89 @@ namespace FraudGuard.Application.Services
                 Description = t.Description
             };
 
-            // Transfer tipi loglar için "Tüm İşlemler" kart listesi boş olacağından, transferlerle dolduralım
-            if (logEntity.TransferTransactionId.HasValue && recentTxList.Count == 0)
+            // DTO listelerini oluşturalım ve birleştirelim
+            var combinedRecentTxDtos = new List<CardRecentTransactionDto>();
+
+            // 1. Kart İşlemlerini ekle
+            if (recentTxList != null)
             {
-                var allTransfers = sentTransferList.Concat(receivedTransferList)
-                    .OrderByDescending(t => t.TransactionDate)
-                    .Take(10)
-                    .ToList();
-                recentTxList = allTransfers.Cast<ITransaction>().ToList();
+                combinedRecentTxDtos.AddRange(recentTxList.Select(t => new CardRecentTransactionDto
+                {
+                    Amount = t.Amount,
+                    Currency = t.Currency,
+                    Location = t.Location,
+                    Country = t.Country,
+                    TransactionTypeName = t.TransactionTypeId == 1 ? "Satış İşlemi" : (t.TransactionTypeId == 2 ? "İade İşlemi" : "Transfer İşlemi"),
+                    TransactionDate = t.TransactionDate,
+                    MerchantCategory = t.MerchantCategory,
+                    Status = t.Status,
+                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    DeclineReason = t.DeclineReason,
+                    PaymentTypeCode = t.PaymentType.ToString(),
+                    SenderIBAN = t.SenderIBAN,
+                    ReceiverIBAN = t.ReceiverIBAN,
+                    ReceiverName = t.ReceiverName,
+                    Description = t.Description
+                }));
             }
+
+            // 2. Gönderilen transferleri ekle
+            if (sentTransferList != null)
+            {
+                combinedRecentTxDtos.AddRange(sentTransferList.Select(t => new CardRecentTransactionDto
+                {
+                    Amount = t.Amount,
+                    Currency = t.Currency,
+                    Location = t.Location,
+                    Country = t.Country,
+                    TransactionTypeName = "Gönderilen Transfer",
+                    TransactionDate = t.TransactionDate,
+                    MerchantCategory = t.MerchantCategory,
+                    Status = t.Status,
+                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    DeclineReason = t.DeclineReason,
+                    PaymentTypeCode = t.PaymentType.ToString(),
+                    SenderIBAN = t.SenderIBAN,
+                    ReceiverIBAN = t.ReceiverIBAN,
+                    ReceiverName = t.ReceiverName,
+                    Description = t.Description
+                }));
+            }
+
+            // 3. Alınan transferleri ekle
+            if (receivedTransferList != null)
+            {
+                combinedRecentTxDtos.AddRange(receivedTransferList.Select(t => new CardRecentTransactionDto
+                {
+                    Amount = t.Amount,
+                    Currency = t.Currency,
+                    Location = t.Location,
+                    Country = t.Country,
+                    TransactionTypeName = "Alınan Transfer",
+                    TransactionDate = t.TransactionDate,
+                    MerchantCategory = t.MerchantCategory,
+                    Status = t.Status,
+                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    DeclineReason = t.DeclineReason,
+                    PaymentTypeCode = t.PaymentType.ToString(),
+                    SenderIBAN = t.SenderIBAN,
+                    ReceiverIBAN = t.ReceiverIBAN,
+                    ReceiverName = t.ReceiverName,
+                    Description = t.Description
+                }));
+            }
+
+            // Tarihe göre sıralayıp son 10'u seçelim
+            var finalRecentTransactions = combinedRecentTxDtos
+                .OrderByDescending(t => t.TransactionDate)
+                .Take(10)
+                .ToList();
 
             var detail = new GetFraudLogDetailResponse
             {
@@ -211,28 +288,7 @@ namespace FraudGuard.Application.Services
                 SuspicionReason = logEntity.Transaction.FraudReason ?? "Sistem tarafından şüpheli bulundu.",
                 FraudReason = logEntity.Transaction.FraudReason,
                 
-                RecentTransactions = recentTxList.Select(t => new CardRecentTransactionDto
-                {
-                    Amount = t.Amount,
-                    Currency = t.Currency,
-                    Location = t.Location,
-                    Country = t.Country,
-                    TransactionTypeName = t.TransactionTypeId == 1 ? "Satış İşlemi" : (t.TransactionTypeId == 2 ? "İade İşlemi" : "Transfer İşlemi"),
-                    TransactionDate = t.TransactionDate,
-                    MerchantCategory = t.MerchantCategory,
-                    Status = t.Status,
-                    
-                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
-                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
-                    
-                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
-                    DeclineReason = t.DeclineReason,
-                    PaymentTypeCode = t.PaymentType.ToString(),
-                    SenderIBAN = t.SenderIBAN,
-                    ReceiverIBAN = t.ReceiverIBAN,
-                    ReceiverName = t.ReceiverName,
-                    Description = t.Description
-                }).ToList(),
+                RecentTransactions = finalRecentTransactions,
                 RecentSuspiciousTransactions = recentSuspiciousTxList.Select(t => new CardRecentTransactionDto
                 {
                     Amount = t.Amount,
@@ -271,7 +327,7 @@ namespace FraudGuard.Application.Services
             return ResponseDTO<GetFraudLogDetailResponse>.Success(detail);
         }
 
-        public async Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetResolvedLogsAsync()
+        public async Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetResolvedLogsAsync(UserRoleEnum callerRole)
         {
             var logs = await _fraudLogRepository.GetResolvedLogsAsync();
             var responseList = _mapper.Map<List<GetUnresolvedLogsResponse>>(logs);
@@ -283,7 +339,6 @@ namespace FraudGuard.Application.Services
 
                 item.SuspicionReason = originalLog.Transaction?.FraudReason ?? "Sistem tarafından şüpheli bulundu.";
                 item.AdminAction = originalLog.AdminAction;
-
                 item.RuleName = originalLog.FraudRule?.RuleName ?? "Genel Şüpheli İşlem";
 
                 var tx = originalLog.Transaction;
@@ -303,6 +358,11 @@ namespace FraudGuard.Application.Services
                 else
                 {
                     item.RiskScore = 75;
+                }
+
+                if (callerRole == UserRoleEnum.Admin)
+                {
+                    item.MaskedCardNumber = cc?.CardNumber ?? dc?.CardNumber ?? originalLog.Transaction?.SenderIBAN ?? "Bilinmiyor";
                 }
             }
 

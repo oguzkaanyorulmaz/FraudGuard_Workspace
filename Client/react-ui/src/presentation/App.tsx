@@ -338,7 +338,7 @@ function Dashboard() {
             <div className="w-full px-2 py-4 md:px-8 md:py-6 flex-1 transition-all duration-300">
 
                 {/* Üst İstatistik Kartları */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+                <div className="grid grid-cols-3 gap-2 md:gap-5 mb-4 md:mb-6">
                     {/* 1. Bekleyen İşlemler - Siyah Çizgili */}
                     <button
                         onClick={() => handleTopCardClick('PENDING')}
@@ -348,10 +348,10 @@ function Dashboard() {
                             }`}
                     >
                         <div className="absolute top-0 left-0 w-full h-1 bg-[#111111]"></div>
-                        <div className={theme.styles.cardTitle}>⬛ Bekleyen Şüpheli İşlem</div>
-                        <div className="flex items-baseline gap-2 mt-2">
-                            <span className="text-3xl font-black text-black">{transactions.length}</span>
-                            <span className="text-xs text-red-500 font-bold animate-pulse">(Canlı)</span>
+                        <div className={theme.styles.cardTitle}>⬛ Bekleyen</div>
+                        <div className="flex items-baseline gap-1 md:gap-2 mt-1 md:mt-2">
+                            <span className={theme.styles.cardValue}>{transactions.length}</span>
+                            <span className="text-[10px] text-red-500 font-bold animate-pulse hidden md:inline">(Canlı)</span>
                         </div>
                     </button>
                     {/* 2. Blokelenen İşlemler - Kırmızı Çizgili */}
@@ -363,8 +363,8 @@ function Dashboard() {
                             }`}
                     >
                         <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
-                        <div className={theme.styles.cardTitle}>🚫 Blokelenen İşlemler</div>
-                        <div className="text-3xl font-black text-red-600 mt-2">{history.filter(h => h.action === 'BLOCKED').length}</div>
+                        <div className={theme.styles.cardTitle}>🚫 Blokelenen</div>
+                        <div className={theme.styles.cardValue}>{history.filter(h => h.action === 'BLOCKED').length}</div>
                     </button>
                     {/* 3. Onaylanan İşlemler - Yeşil Çizgili */}
                     <button
@@ -375,8 +375,8 @@ function Dashboard() {
                             }`}
                     >
                         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
-                        <div className={theme.styles.cardTitle}>✅ Onaylanan İşlemler</div>
-                        <div className="text-3xl font-black text-emerald-600 mt-2">{history.filter(h => h.action === 'APPROVED').length}</div>
+                        <div className={theme.styles.cardTitle}>✅ Onaylanan</div>
+                        <div className={theme.styles.cardValue}>{history.filter(h => h.action === 'APPROVED').length}</div>
                     </button>
                 </div>
 
@@ -408,34 +408,39 @@ function Dashboard() {
 
                         {/* Gelişmiş Filtreler */}
                         <div className="flex flex-col md:flex-row md:flex-nowrap items-stretch md:items-center gap-2 text-sm overflow-visible pb-1 md:pb-0 w-full md:w-auto">
-                            {/* Ödeme Tipi Seçimi */}
-                            <SearchableSelect
-                                options={[
-                                    { value: 'ALL', label: '🔍 Tüm Tipler' },
-                                    { value: 'CREDIT_CARD', label: '💳 Kredi Kartı' },
-                                    { value: 'DEBIT_CARD', label: '🏦 Banka Kartı' },
-                                    { value: 'BANK_TRANSFER', label: '💸 EFT / Havale' }
-                                ]}
-                                value={selectedPaymentType}
-                                onChange={(val) => {
-                                    setSelectedPaymentType(val);
-                                    setSelectedScenario('ALL');
-                                }}
-                                placeholder="🔍 Tüm Tipler"
-                                className="w-full md:w-48"
-                            />
+                            
+                            {/* İki Seçim Kutusunu Yan Yana Getiren Konteyner */}
+                            <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto">
+                                {/* Ödeme Tipi Seçimi */}
+                                <SearchableSelect
+                                    options={[
+                                        { value: 'ALL', label: '🔍 Tüm Tipler' },
+                                        { value: 'CREDIT_CARD', label: '💳 Kredi Kartı' },
+                                        { value: 'DEBIT_CARD', label: '🏦 Banka Kartı' },
+                                        { value: 'BANK_TRANSFER', label: '💸 EFT / Havale' }
+                                    ]}
+                                    value={selectedPaymentType}
+                                    onChange={(val) => {
+                                        setSelectedPaymentType(val);
+                                        setSelectedScenario('ALL');
+                                    }}
+                                    placeholder="🔍 Tüm Tipler"
+                                    className="w-full md:w-48"
+                                />
 
-                            {/* Senaryo Seçimi (Dinamik Süzülen) */}
-                            <SearchableSelect
-                                options={[
-                                    { value: 'ALL', label: '📋 Tüm Senaryolar' },
-                                    ...(paymentTypeScenarios[selectedPaymentType] || [])
-                                ]}
-                                value={selectedScenario}
-                                onChange={setSelectedScenario}
-                                placeholder="📋 Senaryo Seçiniz"
-                                className="w-full md:w-52"
-                            />
+                                {/* Senaryo Seçimi (Dinamik Süzülen) */}
+                                <SearchableSelect
+                                    options={[
+                                        { value: 'ALL', label: '📋 Tüm Senaryolar' },
+                                        ...(paymentTypeScenarios[selectedPaymentType] || [])
+                                    ]}
+                                    value={selectedScenario}
+                                    onChange={setSelectedScenario}
+                                    placeholder="📋 Senaryo Seçiniz"
+                                    className="w-full md:w-52"
+                                    alignRight={true}
+                                />
+                            </div>
 
                             <div className="relative flex items-center bg-white border border-[#C5CBD3] rounded-lg px-3 py-1.5 transition-all focus-within:border-[#FDBB30] focus-within:ring-2 focus-within:ring-[#FDBB30]/20 w-full md:w-64">
                                 <svg

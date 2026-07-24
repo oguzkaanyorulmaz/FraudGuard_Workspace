@@ -14,14 +14,13 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
         public DbSet<ECustomer> Customers { get; set; }
         public DbSet<ECreditCard> CreditCards { get; set; }
         public DbSet<ECreditCardTransaction> CreditCardTransactions { get; set; }
-public DbSet<EDebitCardTransaction> DebitCardTransactions { get; set; }
-public DbSet<ETransferTransaction> TransferTransactions { get; set; }
+        public DbSet<EDebitCardTransaction> DebitCardTransactions { get; set; }
+        public DbSet<ETransferTransaction> TransferTransactions { get; set; }
         public DbSet<EDebitCard> DebitCards { get; set; }
         public DbSet<EChannelType> ChannelTypes { get; set; }
         public DbSet<EBankAccountBeneficiary> BankAccountBeneficiaries { get; set; }
         public DbSet<ETransactionType> TransactionTypes { get; set; } 
         public DbSet<EUser> Users { get; set; }
-
         public DbSet<EFraudRule> FraudRules { get; set; }
         public DbSet<EFraudLog> FraudLogs { get; set; }
         public DbSet<EBlockReason> BlockReasons { get; set; }

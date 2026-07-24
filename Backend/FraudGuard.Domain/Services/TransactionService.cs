@@ -381,6 +381,7 @@ namespace FraudGuard.Domain.Services
                     }
                 }
                                     // 🟢 1. ATM PARA YATIRMA (Sadece Banka Kartlarında Bakiye Arttırır)
+                                // 🟢 1. ATM PARA YATIRMA (Sadece Banka Kartlarında Bakiye Arttırır)
                 else if (input.TransactionType == TransactionTypeEnum.Deposit)
                 {
                     if (isCredit)
@@ -394,12 +395,29 @@ namespace FraudGuard.Domain.Services
                     debitCard.Balance += processedAmount;
                     await _debitCardRepository.UpdateAsync(debitCard);
                     
-                    result.Status = "Approved"; // Para yatırma işlemi doğrudan onaylanır
+                    result.Status = "Approved"; // Para yatırma işlemi varsayılan olarak onaylanır
                     await _cacheProvider.RemoveAsync(cacheKey);
                     await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
+
+                    // 💥 FRAUD DEĞERLENDİRMESİ
+                    if (!isBlocked && !isCvvSuspicious)
+                    {
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
+                        triggeredRuleCode = evaluationResult.RuleCode;
+                        capturedFraudReason = evaluationResult.FraudReason;
+
+                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
+                        if (isSuspicious)
+                        {
+                            result.Status = "Suspicious";
+                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                        }
+                    }
                 }
+
                 
                 // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
+                                // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
                                 // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
                 else if (input.TransactionType == TransactionTypeEnum.CardPayment)
                 {
@@ -428,7 +446,23 @@ namespace FraudGuard.Domain.Services
                     result.Status = "Approved"; // Borç ödeme onaylanır
                     await _cacheProvider.RemoveAsync(cacheKey);
                     await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
+
+                    // 💥 FRAUD DEĞERLENDİRMESİ
+                    if (!isBlocked && !isCvvSuspicious)
+                    {
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
+                        triggeredRuleCode = evaluationResult.RuleCode;
+                        capturedFraudReason = evaluationResult.FraudReason;
+
+                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
+                        if (isSuspicious)
+                        {
+                            result.Status = "Suspicious";
+                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                        }
+                    }
                 }
+
 
 
 

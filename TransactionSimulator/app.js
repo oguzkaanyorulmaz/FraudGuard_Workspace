@@ -40,6 +40,32 @@ const channelTypeSelect = document.getElementById('channelTypeId');
 const merchantCategorySelect = document.getElementById('merchantCategory');
 const merchantCategoryGroup = merchantCategorySelect.closest('.form-group');
 
+const allChannels = [
+    { value: '1', label: 'POS (Fiziksel POS)' },
+    { value: '2', label: 'VirtualPOS (Sanal POS)' },
+    { value: '3', label: 'ATM (ATM Cihazı)' },
+    { value: '4', label: 'Mobile (Mobil Şube)' },
+    { value: '5', label: 'Web (İnternet Şubesi)' }
+];
+
+function populateChannelOptions(allowedIds, defaultValue) {
+    const currentVal = channelTypeSelect.value;
+    channelTypeSelect.innerHTML = '';
+    
+    allChannels.forEach(ch => {
+        const id = parseInt(ch.value, 10);
+        if (allowedIds.includes(id)) {
+            const opt = document.createElement('option');
+            opt.value = ch.value;
+            opt.textContent = ch.label;
+            channelTypeSelect.appendChild(opt);
+        }
+    });
+
+    const isCurrentAllowed = allowedIds.includes(parseInt(currentVal, 10));
+    channelTypeSelect.value = isCurrentAllowed ? currentVal : defaultValue.toString();
+}
+
 function handleTransactionTypeChange() {
     const txType = parseInt(transactionTypeSelect.value, 10);
     
@@ -53,39 +79,16 @@ function handleTransactionTypeChange() {
         rrnInput.value = '';
     }
 
-    // Kanal Tipi Seçeneklerini Sıfırla ve Aktifleştir
-    Array.from(channelTypeSelect.options).forEach(opt => opt.style.display = 'block');
     channelTypeSelect.disabled = false;
 
     if (txType === 3) { // ATM Para Yatırma
-        channelTypeSelect.value = '3'; // Sadece ATM seçilebilir
-        channelTypeSelect.disabled = true;
+        populateChannelOptions([3], 3);
     } 
     else if (txType === 4) { // Kredi Kartı Borç Ödeme
-        // POS (1) ve Sanal POS (2) gizlenir. Sadece ATM (3), Mobil (4), Web (5) açık kalır.
-        Array.from(channelTypeSelect.options).forEach(opt => {
-            const val = parseInt(opt.value, 10);
-            if (val === 1 || val === 2) {
-                opt.style.display = 'none';
-            }
-        });
-        // Eğer seçili olan değer POS veya Sanal POS ise, varsayılanı Mobil Bankacılık (4) yapalım
-        if (channelTypeSelect.value === '1' || channelTypeSelect.value === '2') {
-            channelTypeSelect.value = '4';
-        }
+        populateChannelOptions([3, 4, 5], 4);
     }
     else if (txType === 1 || txType === 2) { // Satış veya İade
-        // ATM (3) gizlenir. POS (1), Sanal POS (2), Mobil (4), Web (5) açık kalır.
-        Array.from(channelTypeSelect.options).forEach(opt => {
-            const val = parseInt(opt.value, 10);
-            if (val === 3) {
-                opt.style.display = 'none';
-            }
-        });
-        // Eğer şu an ATM (3) seçili ise, varsayılan olarak Sanal POS (2) seçelim
-        if (channelTypeSelect.value === '3') {
-            channelTypeSelect.value = '2';
-        }
+        populateChannelOptions([1, 2, 4, 5], 2);
     }
 
     // Kanal değiştiği için kategori görünürlüğünü de güncelle
@@ -613,26 +616,19 @@ clearHistory.addEventListener('click', () => {
 // ─── Backend Health Check ───
 async function checkBackend() {
     try {
-        const res = await fetch(`${API_BASE}/process`, {
-            method: 'OPTIONS'
+        const res = await fetch(`${API_BASE}/ping`, {
+            method: 'GET'
         });
-        statusIndicator.className = 'status-indicator online';
-        statusText.textContent = 'Backend Aktif';
-    } catch {
-        // Try another way — just attempt a HEAD or small request
-        try {
-            const res = await fetch('/api/transactions/process', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: '{}'
-            });
-            // Even if it returns 400, backend is alive
+        if (res.ok) {
             statusIndicator.className = 'status-indicator online';
             statusText.textContent = 'Backend Aktif';
-        } catch {
+        } else {
             statusIndicator.className = 'status-indicator offline';
             statusText.textContent = 'Backend Kapalı';
         }
+    } catch (err) {
+        statusIndicator.className = 'status-indicator offline';
+        statusText.textContent = 'Backend Bağlantı Hatası';
     }
 }
 

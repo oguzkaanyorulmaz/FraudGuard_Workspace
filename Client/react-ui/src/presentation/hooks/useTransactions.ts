@@ -57,19 +57,18 @@ export function useTransactions() {
         fetchTransactions();
 
         // 2. SignalR Bağlantısını Hazırla
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
         const connection = new signalR.HubConnectionBuilder()
-            .withUrl("http://localhost:5217/fraudHub") // C# Backend'indeki Hub URL'si
+            .withUrl(`http://${host}:5217/fraudHub`) // C# Backend'indeki Hub URL'si
+            .configureLogging(signalR.LogLevel.Warning) // 👈 Sadece Uyarı ve Hataları gösterir, Info loglarını gizler
             .withAutomaticReconnect() // Bağlantı anlık koparsa kendi kendine tekrar dener
             .build();
 
         // 3. Bağlantıyı Başlat ve Dinlemeye Geç
         connection.start()
             .then(() => {
-                console.log("🟢 SignalR Bağlantısı Başarılı!");
-
                 // Backend'den gelen 'RefreshLogs' sinyalini dinle
                 connection.on("RefreshLogs", () => {
-                    console.log("⚡ Backend'den yeni veri sinyali geldi, liste güncelleniyor...");
                     fetchTransactions();
                 });
             })
@@ -77,7 +76,7 @@ export function useTransactions() {
 
         // 4. Temizlik (Cleanup): Bileşen ekrandan kalkarsa bağlantıyı kapat
         return () => {
-            connection.stop().then(() => console.log("SignalR Bağlantısı Kapatıldı."));
+            connection.stop();
         };
     }, [fetchTransactions]);
     // ----------------------------------------------------

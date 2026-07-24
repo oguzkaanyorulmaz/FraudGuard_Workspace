@@ -31,6 +31,7 @@ namespace FraudGuard.API.Middleware
                 path.Contains("/api/auth/register") ||
                 path.Contains("/api/transactions/process") ||
                 path.Contains("/api/transactions/transfer") ||
+                path.Contains("/api/transactions/ping") ||
                 path.Contains("/swagger") ||
                 path.Contains("/fraudhub"))
             {

@@ -3,7 +3,10 @@ import { Transaction } from '../../domain/entities/Transaction';
 import { Money } from '../../domain/value-objects/Money';
 
 export class ApiTransactionRepo implements ITransactionRepository {
-    private readonly fraudManagementUrl = 'http://localhost:5217/api/FraudManagement';
+    private get fraudManagementUrl(): string {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+        return `http://${host}:5217/api/FraudManagement`;
+    }
 
     private getToken(): string {
         try {

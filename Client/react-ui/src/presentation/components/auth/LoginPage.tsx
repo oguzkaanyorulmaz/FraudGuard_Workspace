@@ -126,6 +126,8 @@ export const LoginPage: React.FC = () => {
                                                 onChange={(e) => setUsername(e.target.value)}
                                                 className="w-full pl-4 pr-10 py-3.5 border border-[#E4E7EB] rounded-xl text-sm font-semibold text-[#111] focus:outline-none focus:ring-2 focus:ring-[#FDBB30]/30 focus:border-[#FDBB30] transition-all bg-white"
                                                 placeholder="Kullanıcı adınızı giriniz"
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
                                                 required
                                             />
                                             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">👤</span>
@@ -170,6 +172,8 @@ export const LoginPage: React.FC = () => {
                                             onChange={(e) => setUsername(e.target.value)}
                                             className="w-full px-4 py-3.5 border border-[#E4E7EB] rounded-xl text-sm font-semibold text-[#111] focus:outline-none focus:ring-2 focus:ring-[#FDBB30]/30 focus:border-[#FDBB30] transition-all bg-white"
                                             placeholder="Kullanıcı adı girin"
+                                            autoCapitalize="none"
+                                            autoCorrect="off"
                                             required
                                         />
                                     </div>
@@ -183,6 +187,8 @@ export const LoginPage: React.FC = () => {
                                             onChange={(e) => setEmail(e.target.value)}
                                             className="w-full px-4 py-3.5 border border-[#E4E7EB] rounded-xl text-sm font-semibold text-[#111] focus:outline-none focus:ring-2 focus:ring-[#FDBB30]/30 focus:border-[#FDBB30] transition-all bg-white"
                                             placeholder="ornek@mail.com"
+                                            autoCapitalize="none"
+                                            autoCorrect="off"
                                             required
                                         />
                                     </div>

@@ -39,7 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = async (username: string, password: string): Promise<boolean> => {
         try {
-            const res = await fetch('http://localhost:5217/api/Auth/login', {
+            const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+            const res = await fetch(`http://${host}:5217/api/Auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -64,7 +65,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const register = async (username: string, email: string, password: string, role: number): Promise<boolean> => {
         try {
-            const res = await fetch('http://localhost:5217/api/Auth/register', {
+            const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+            const res = await fetch(`http://${host}:5217/api/Auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, mail: email, password, role })

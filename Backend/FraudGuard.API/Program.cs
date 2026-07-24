@@ -63,12 +63,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:4000")
+        policy.SetIsOriginAllowed(origin => true) // 👈 IP veya localhost fark etmeksizin mobil erişime izin verir
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
+
 
 
 var app = builder.Build();

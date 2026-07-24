@@ -8,9 +8,9 @@ namespace FraudGuard.Application.Interfaces
 {
     public interface IFraudManagementAppService
     {
-        Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetUnresolvedLogsAsync();
+        Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetUnresolvedLogsAsync(UserRoleEnum callerRole);
         Task<ResponseDTO<bool>> ResolveLogAsync(ResolveFraudLogRequest request);
         Task<ResponseDTO<GetFraudLogDetailResponse>> GetLogDetailAsync(int logId, UserRoleEnum callerRole);
-        Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetResolvedLogsAsync();
+        Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetResolvedLogsAsync(UserRoleEnum callerRole);
     }
 }

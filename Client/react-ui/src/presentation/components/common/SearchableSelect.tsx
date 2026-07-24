@@ -11,6 +11,7 @@ interface Props {
     onChange: (value: string) => void;
     placeholder: string;
     className?: string;
+    alignRight?: boolean;
 }
 
 export const SearchableSelect: React.FC<Props> = ({
@@ -18,7 +19,8 @@ export const SearchableSelect: React.FC<Props> = ({
     value,
     onChange,
     placeholder,
-    className = ""
+    className = "",
+    alignRight = false
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,7 @@ export const SearchableSelect: React.FC<Props> = ({
 
             {/* Dropdown Panel */}
             <div
-                className={`absolute left-0 mt-1.5 w-[240px] md:w-[280px] bg-white border border-[#C5CBD3] rounded-xl shadow-xl z-50 transition-all duration-200 origin-top transform ${
+                className={`absolute ${alignRight ? 'right-0 left-auto' : 'left-0'} mt-1.5 w-[240px] md:w-[280px] bg-white border border-[#C5CBD3] rounded-xl shadow-xl z-50 transition-all duration-200 origin-top transform ${
                     isOpen 
                         ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto' 
                         : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'

@@ -4,6 +4,8 @@ using FraudGuard.Application.DTOs.FraudManagement;
 using System.Threading.Tasks;
 using FraudGuard.API.Middleware;
 using FraudGuard.Domain.Common.Enums;
+using Microsoft.AspNetCore.SignalR;
+using FraudGuard.API.Hubs;
 
 
 namespace FraudGuard.API.Controllers
@@ -13,16 +15,19 @@ namespace FraudGuard.API.Controllers
     public class FraudManagementController : ControllerBase
     {
         private readonly IFraudManagementAppService _fraudManagementAppService;
+        private readonly IHubContext<FraudHub> _hubContext;
 
-        public FraudManagementController(IFraudManagementAppService fraudManagementAppService)
+        public FraudManagementController(IFraudManagementAppService fraudManagementAppService, IHubContext<FraudHub> hubContext)
         {
             _fraudManagementAppService = fraudManagementAppService;
+            _hubContext = hubContext;
         }
 
         [HttpGet("unresolved-logs")]
         public async Task<IActionResult> GetUnresolvedLogs()
         {
-            var response = await _fraudManagementAppService.GetUnresolvedLogsAsync();
+            var role = HttpContext.Items["role"] as UserRoleEnum? ?? UserRoleEnum.Analyst;
+            var response = await _fraudManagementAppService.GetUnresolvedLogsAsync(role);
             
             if (response.IsSuccess)
                 return Ok(response);
@@ -33,18 +38,22 @@ namespace FraudGuard.API.Controllers
         [HttpGet("resolved-logs")]
         public async Task<IActionResult> GetResolvedLogs()
         {
-            var result = await _fraudManagementAppService.GetResolvedLogsAsync();
+            var role = HttpContext.Items["role"] as UserRoleEnum? ?? UserRoleEnum.Analyst;
+            var result = await _fraudManagementAppService.GetResolvedLogsAsync(role);
             return Ok(result);
         }
 
         [RoleRequired(UserRoleEnum.Admin, UserRoleEnum.DecisionMaker)]
-[HttpPost("resolve-log")]
-public async Task<IActionResult> ResolveLog([FromBody] ResolveFraudLogRequest request)
+        [HttpPost("resolve-log")]
+        public async Task<IActionResult> ResolveLog([FromBody] ResolveFraudLogRequest request)
         {
             var response = await _fraudManagementAppService.ResolveLogAsync(request);
             
             if (response.IsSuccess)
+            {
+                await _hubContext.Clients.All.SendAsync("RefreshLogs");
                 return Ok(response);
+            }
                 
             return BadRequest(response);
         }

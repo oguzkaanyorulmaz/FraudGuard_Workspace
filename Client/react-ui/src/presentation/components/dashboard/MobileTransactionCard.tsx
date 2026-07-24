@@ -72,30 +72,36 @@ export const MobileTransactionCard: React.FC<Props> = ({
             </div>
 
             {/* Kart Gövdesi: Bilgi Alanları */}
-            <div className="mobile-txn-card-body">
-                <div className="mobile-txn-card-field">
-                    <span className="mobile-txn-card-label">Kart / IBAN</span>
-                    <span className="mobile-txn-card-value font-mono text-xs">{formatIdentifier(transaction.maskedCard)}</span>
+            <div className="mt-3 space-y-3">
+                {/* Satır 1: Kart/IBAN (sol) ve Tutar (sağ) */}
+                <div className="flex justify-between items-baseline gap-2">
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-[#718096] uppercase tracking-wider mb-0.5">KART / IBAN</span>
+                        <span className="font-mono text-xs md:text-sm font-bold text-[#111]">{formatIdentifier(transaction.maskedCard)}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-bold text-[#718096] uppercase tracking-wider mb-0.5">TUTAR</span>
+                        <span className="text-xs md:text-sm font-black text-black">{transaction.money ? transaction.money.getFormatted() : '₺0.00'}</span>
+                    </div>
                 </div>
-                <div className="mobile-txn-card-field">
-                    <span className="mobile-txn-card-label">Tutar</span>
-                    <span className="mobile-txn-card-value font-black">{transaction.money ? transaction.money.getFormatted() : '₺0.00'}</span>
+
+                {/* Satır 2: Tarih (sol) ve Kural (sağ) */}
+                <div className="flex justify-between items-center gap-2 pt-2 border-t border-gray-100">
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-[#718096] uppercase tracking-wider mb-0.5">TARİH</span>
+                        <span className="text-[11px] text-slate-700 font-semibold">{new Date(transaction.date).toLocaleString('tr-TR')}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-bold text-[#718096] uppercase tracking-wider mb-0.5">KURAL</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${isHighRisk ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-800 border-amber-100'} whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] md:max-w-[200px]`} title={transaction.ruleName || 'SİSTEM'}>
+                            {transaction.ruleName || 'SİSTEM'}
+                        </span>
+                    </div>
                 </div>
-                <div className="mobile-txn-card-field">
-                    <span className="mobile-txn-card-label">Tarih</span>
-                    <span className="mobile-txn-card-value text-xs text-slate-600">{new Date(transaction.date).toLocaleString('tr-TR')}</span>
-                </div>
-                <div className="mobile-txn-card-field">
-                    <span className="mobile-txn-card-label">Kural</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold w-max border ${isHighRisk ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-800 border-amber-100'}`}>
-                        {transaction.ruleName || 'SİSTEM'}
-                    </span>
-                </div>
-                <div className="mobile-txn-card-field full-width">
-                    <span className="mobile-txn-card-label">Şüphe Sebebi</span>
-                    <span className="mobile-txn-card-value text-xs text-slate-700">
-                        ↳ {transaction.suspicionReason || 'Sistem tarafından riskli bulunarak incelemeye alındı.'}
-                    </span>
+
+                {/* Satır 3: Şüphe Sebebi (tam genişlik) */}
+                <div className="bg-slate-50 border-l-2 border-amber-400 p-2.5 rounded-r-lg text-xs text-slate-700 leading-relaxed">
+                    <span className="font-bold text-[#8F6A0F] mr-1">Sebep:</span> {transaction.suspicionReason || 'Sistem tarafından riskli bulunarak incelemeye alındı.'}
                 </div>
             </div>
 
@@ -133,9 +139,9 @@ export const MobileTransactionCard: React.FC<Props> = ({
                 )}
                 <button
                     onClick={() => onViewDetails(transaction)}
-                    className="flex-1 h-9 rounded-lg text-xs font-semibold border border-[#C5CBD3] bg-white text-slate-700 cursor-pointer hover:bg-slate-50 transition-all"
+                    className={`${isHistoryView ? 'w-12 flex-shrink-0' : 'flex-1'} h-9 rounded-lg text-xs font-semibold border border-[#C5CBD3] bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50 transition-all`}
                 >
-                    🔍 Detay
+                    {isHistoryView ? '🔍' : '🔍 Detay'}
                 </button>
             </div>
         </div>
