@@ -15,19 +15,19 @@ export const BulkActionBar: React.FC<Props> = ({ selectedCount, onBulkBlock, onC
     if (selectedCount === 0) return null;
 
     return (
-        <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl mt-4 flex justify-between items-center transition-all shadow-sm">
+        <div className="bg-amber-50 border border-amber-200/80 p-3 md:p-3.5 rounded-xl mt-4 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 transition-all shadow-sm bulk-action-bar-mobile">
             <div className="flex items-center gap-3">
-                <span className="bg-[#FFC72C] text-[#111] w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-sm">
+                <span className="bg-[#FFC72C] text-[#111] w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-sm flex-shrink-0">
                     {selectedCount}
                 </span>
                 <span className="text-[#1A1D20] text-sm font-semibold">şüpheli işlem seçildi</span>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col md:flex-row gap-2 md:gap-3 bulk-buttons">
                 <button
                     onClick={onClear}
                     title="Seçilenleri temizlemek için tıklayın"
-                    className="relative overflow-hidden w-[170px] h-9 rounded-lg transition-all duration-500 flex items-center border-none outline-none select-none bg-[#1A1D20] text-white cursor-pointer group"
+                    className="relative overflow-hidden w-full md:w-[170px] h-9 rounded-lg transition-all duration-500 flex items-center justify-center border-none outline-none select-none bg-[#1A1D20] text-white cursor-pointer group"
                 >
                     <span className="absolute left-0 top-0 h-full w-8 flex items-center justify-center transition-all duration-500 bg-[#1A1D20] group-hover:w-full group-active:scale-90 text-sm">
                         ✖
@@ -40,7 +40,7 @@ export const BulkActionBar: React.FC<Props> = ({ selectedCount, onBulkBlock, onC
                 <button
                     onClick={() => !isAnalyst && onBulkApprove()}
                     disabled={isAnalyst}
-                    className={`relative overflow-hidden w-[170px] h-9 rounded-lg transition-all duration-500 flex items-center border-none outline-none select-none ${
+                    className={`relative overflow-hidden w-full md:w-[170px] h-9 rounded-lg transition-all duration-500 flex items-center justify-center border-none outline-none select-none ${
                         isAnalyst 
                             ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed' 
                             : 'bg-[#FDBB30] text-[#111] cursor-pointer group'
@@ -61,7 +61,7 @@ export const BulkActionBar: React.FC<Props> = ({ selectedCount, onBulkBlock, onC
                 <button
                     onClick={() => !isAnalyst && onBulkBlock()}
                     disabled={isAnalyst}
-                    className={`relative overflow-hidden w-[170px] h-9 rounded-lg transition-all duration-500 flex items-center border-none outline-none select-none ${
+                    className={`relative overflow-hidden w-full md:w-[170px] h-9 rounded-lg transition-all duration-500 flex items-center justify-center border-none outline-none select-none ${
                         isAnalyst 
                             ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed' 
                             : 'bg-red-600 text-white cursor-pointer group'

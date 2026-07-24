@@ -33,6 +33,7 @@ function Dashboard() {
     const [selectedPaymentType, setSelectedPaymentType] = useState<string>('ALL');
 
     // Ödeme Tipine Göre Gruplanmış Senaryolar
+    // Ödeme Tipine Göre Gruplanmış Senaryolar
     const paymentTypeScenarios: Record<string, { value: string; label: string }[]> = {
         ALL: [
             { value: 'BRUTE_FORCE', label: 'Ardışık Red (Brute Force)' },
@@ -46,7 +47,6 @@ function Dashboard() {
             { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
             { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
             { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İptal/İade (High Value Refund)' },
-            { value: 'LATE_VOID', label: 'Gecikmiş İptal Kuralı (Late Void)' },
             { value: 'ACCOUNT_DRAIN', label: 'Hesap Boşaltma (Account Drain)' },
             { value: 'SMURFING', label: 'Dilimleme (Smurfing)' },
             { value: 'WALLET_CASHOUT', label: 'Wallet Cash-Out' },
@@ -56,7 +56,11 @@ function Dashboard() {
             { value: 'SUSPICIOUS_DESCRIPTION', label: 'Şüpheli Açıklama' },
             { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
             { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' },
-            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderim (Multi-Sender)' }
+            { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderim (Multi-Sender)' },
+            // 📥 ATM Para Yatırma ve Harcama Yeni Kuralları
+            { value: 'DEPOSIT_AND_RUN', label: 'Yatır ve Kaç Kuralı (Deposit and Run)' },
+            { value: 'DEPOSIT_LIMIT_AVOIDANCE', label: 'Yapılandırılmış Aklama (Deposit Limit Avoidance)' },
+            { value: 'ANOMALOUS_DEPOSIT_TIME', label: 'Gece Yarısı Nakit Akışı (Anomalous Deposit)' }
         ],
         CREDIT_CARD: [
             { value: 'BRUTE_FORCE', label: 'Ardışık Red (Brute Force)' },
@@ -69,8 +73,7 @@ function Dashboard() {
             { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
             { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
             { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
-            { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İptal/İade (High Value Refund)' },
-            { value: 'LATE_VOID', label: 'Gecikmiş İptal Kuralı (Late Void)' }
+            { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İade (High Value Refund)' }
         ],
         DEBIT_CARD: [
             { value: 'ACCOUNT_DRAIN', label: 'Hesap Boşaltma (Account Drain)' },
@@ -83,8 +86,11 @@ function Dashboard() {
             { value: 'HIGH_RISK_MCC', label: 'Yüksek Riskli MCC (İşyeri)' },
             { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
             { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
-            { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İptal/İade (High Value Refund)' },
-            { value: 'LATE_VOID', label: 'Gecikmiş İptal Kuralı (Late Void)' }
+            { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İade (High Value Refund)' },
+            // 📥 Banka Kartı İçin Yeni Eklenen ATM Kuralları
+            { value: 'DEPOSIT_AND_RUN', label: 'Yatır ve Kaç Kuralı (Deposit and Run)' },
+            { value: 'DEPOSIT_LIMIT_AVOIDANCE', label: 'Yapılandırılmış Aklama (Deposit Limit Avoidance)' },
+            { value: 'ANOMALOUS_DEPOSIT_TIME', label: 'Gece Yarısı Nakit Akışı (Anomalous Deposit)' }
         ],
         BANK_TRANSFER: [
             { value: 'SMURFING', label: 'Dilimleme (Smurfing)' },
@@ -99,6 +105,7 @@ function Dashboard() {
             { value: 'ANOMALOUS_TIME', label: 'Gece Sıradışı Tutar (Anomalous Time)' }
         ]
     };
+
 
 
     const [sortFields, setSortFields] = useState<{ field: string; direction: 'asc' | 'desc' }[]>([
@@ -328,7 +335,7 @@ function Dashboard() {
         <div className={theme.styles.body}>
             <Header />
             {/* Full-width container to occupy the entire screen */}
-            <div className="w-full px-4 py-6 md:px-8 flex-1 transition-all duration-300">
+            <div className="w-full px-2 py-4 md:px-8 md:py-6 flex-1 transition-all duration-300">
 
                 {/* Üst İstatistik Kartları */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
@@ -376,7 +383,7 @@ function Dashboard() {
 
                 {/* Filtreleme ve Tab Alanı */}
                 <div className={theme.styles.filterSection}>
-                    <div className="flex flex-wrap justify-between items-center gap-4">
+                    <div className="flex flex-col md:flex-row flex-wrap justify-between items-stretch md:items-center gap-3 md:gap-4">
                         <div className={theme.styles.tabContainer}>
                             <button
                                 onClick={() => toggleTab('PENDING')}
@@ -400,7 +407,7 @@ function Dashboard() {
 
 
                         {/* Gelişmiş Filtreler */}
-                        <div className="flex flex-wrap md:flex-nowrap items-center gap-2 text-sm overflow-visible pb-1 md:pb-0">
+                        <div className="flex flex-col md:flex-row md:flex-nowrap items-stretch md:items-center gap-2 text-sm overflow-visible pb-1 md:pb-0 w-full md:w-auto">
                             {/* Ödeme Tipi Seçimi */}
                             <SearchableSelect
                                 options={[
@@ -415,7 +422,7 @@ function Dashboard() {
                                     setSelectedScenario('ALL');
                                 }}
                                 placeholder="🔍 Tüm Tipler"
-                                className="w-40 md:w-48"
+                                className="w-full md:w-48"
                             />
 
                             {/* Senaryo Seçimi (Dinamik Süzülen) */}
@@ -427,14 +434,14 @@ function Dashboard() {
                                 value={selectedScenario}
                                 onChange={setSelectedScenario}
                                 placeholder="📋 Senaryo Seçiniz"
-                                className="w-44 md:w-52"
+                                className="w-full md:w-52"
                             />
 
-                            <div className="relative flex items-center bg-white border border-[#C5CBD3] rounded-lg px-3 py-1.5 transition-all focus-within:border-[#FDBB30] focus-within:ring-2 focus-within:ring-[#FDBB30]/20 w-44 md:w-64">
-                                <svg 
-                                    className="w-4 h-4 text-slate-500 mr-2 flex-shrink-0" 
-                                    fill="none" 
-                                    stroke="currentColor" 
+                            <div className="relative flex items-center bg-white border border-[#C5CBD3] rounded-lg px-3 py-1.5 transition-all focus-within:border-[#FDBB30] focus-within:ring-2 focus-within:ring-[#FDBB30]/20 w-full md:w-64">
+                                <svg
+                                    className="w-4 h-4 text-slate-500 mr-2 flex-shrink-0"
+                                    fill="none"
+                                    stroke="currentColor"
                                     viewBox="0 0 24 24"
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -447,15 +454,15 @@ function Dashboard() {
                                     className="w-full bg-transparent border-none outline-none text-xs md:text-sm text-[#1A1D20] placeholder-slate-400 focus:ring-0 p-0 pr-5"
                                 />
                                 {searchTerm && (
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => setSearchTerm('')}
                                         className="absolute right-2 text-slate-400 hover:text-slate-700 bg-transparent border-none outline-none cursor-pointer flex items-center justify-center p-0"
                                     >
-                                        <svg 
-                                            className="w-4 h-4" 
-                                            fill="none" 
-                                            stroke="currentColor" 
+                                        <svg
+                                            className="w-4 h-4"
+                                            fill="none"
+                                            stroke="currentColor"
                                             viewBox="0 0 24 24"
                                         >
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

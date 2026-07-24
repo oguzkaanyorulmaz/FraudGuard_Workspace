@@ -26,19 +26,25 @@ const transferSubmitBtn = document.getElementById('transferSubmitBtn');
 // ─── State ───
 let history = [];
 let historyFilter = 'all';
+let expandedHistoryId = null;
 
 // ─── Tab Switching ───
 tabCard.addEventListener('click', () => switchTab('card'));
 tabTransfer.addEventListener('click', () => switchTab('transfer'));
 
-// --- Transaction Type Change Handler (Show/Hide RRN for Refund) ---
+// --- Transaction and Channel Type Constraints Handler ---
 const transactionTypeSelect = document.getElementById('transactionType');
 const rrnGroup = document.getElementById('rrnGroup');
 const rrnInput = document.getElementById('rrnInput');
+const channelTypeSelect = document.getElementById('channelTypeId');
+const merchantCategorySelect = document.getElementById('merchantCategory');
+const merchantCategoryGroup = merchantCategorySelect.closest('.form-group');
 
-transactionTypeSelect.addEventListener('change', () => {
-    const val = parseInt(transactionTypeSelect.value, 10);
-    if (val === 2) {
+function handleTransactionTypeChange() {
+    const txType = parseInt(transactionTypeSelect.value, 10);
+    
+    // RRN (Referans No) Alanı Kontrolü (Sadece İade İşleminde zorunlu)
+    if (txType === 2) {
         rrnGroup.style.display = 'block';
         rrnInput.required = true;
     } else {
@@ -46,7 +52,61 @@ transactionTypeSelect.addEventListener('change', () => {
         rrnInput.required = false;
         rrnInput.value = '';
     }
-});
+
+    // Kanal Tipi Seçeneklerini Sıfırla ve Aktifleştir
+    Array.from(channelTypeSelect.options).forEach(opt => opt.style.display = 'block');
+    channelTypeSelect.disabled = false;
+
+    if (txType === 3) { // ATM Para Yatırma
+        channelTypeSelect.value = '3'; // Sadece ATM seçilebilir
+        channelTypeSelect.disabled = true;
+    } 
+    else if (txType === 4) { // Kredi Kartı Borç Ödeme
+        // POS (1) ve Sanal POS (2) gizlenir. Sadece ATM (3), Mobil (4), Web (5) açık kalır.
+        Array.from(channelTypeSelect.options).forEach(opt => {
+            const val = parseInt(opt.value, 10);
+            if (val === 1 || val === 2) {
+                opt.style.display = 'none';
+            }
+        });
+        // Eğer seçili olan değer POS veya Sanal POS ise, varsayılanı Mobil Bankacılık (4) yapalım
+        if (channelTypeSelect.value === '1' || channelTypeSelect.value === '2') {
+            channelTypeSelect.value = '4';
+        }
+    }
+    else if (txType === 1 || txType === 2) { // Satış veya İade
+        // ATM (3) gizlenir. POS (1), Sanal POS (2), Mobil (4), Web (5) açık kalır.
+        Array.from(channelTypeSelect.options).forEach(opt => {
+            const val = parseInt(opt.value, 10);
+            if (val === 3) {
+                opt.style.display = 'none';
+            }
+        });
+        // Eğer şu an ATM (3) seçili ise, varsayılan olarak Sanal POS (2) seçelim
+        if (channelTypeSelect.value === '3') {
+            channelTypeSelect.value = '2';
+        }
+    }
+
+    // Kanal değiştiği için kategori görünürlüğünü de güncelle
+    handleChannelTypeChange();
+}
+
+function handleChannelTypeChange() {
+    const channelVal = parseInt(channelTypeSelect.value, 10);
+    if (channelVal === 3) { // ATM Cihazı
+        merchantCategoryGroup.style.display = 'none';
+    } else {
+        merchantCategoryGroup.style.display = 'block';
+    }
+}
+
+// Event Listeners
+transactionTypeSelect.addEventListener('change', handleTransactionTypeChange);
+channelTypeSelect.addEventListener('change', handleChannelTypeChange);
+
+// Sayfa ilk yüklendiğinde kısıtlamaları hemen uygulamak için fonksiyonu bir kez çalıştıralım:
+handleTransactionTypeChange();
 
 function switchTab(tab) {
     if (tab === 'card') {
@@ -66,23 +126,94 @@ function switchTab(tab) {
 }
 
 // ─── Card Number Formatting ───
+// ─── Kart Numarası Biçimlendirme, Logo ve Geçerlilik Kontrolü ───
 const cardNumberInput = document.getElementById('cardNumber');
 const paymentTypeSelect = document.getElementById('paymentType');
+const cardLogoContainer = document.getElementById('cardLogoContainer');
+const cardNumberError = document.getElementById('cardNumberError');
+const cardInputWrapper = cardNumberInput.closest('.input-wrapper');
+
+// Dinamik SVG Logoları
+const CARD_LOGOS = {
+    visa: `
+        <svg class="card-brand-logo visible" viewBox="0 0 36 12" width="36" height="12">
+            <text x="0" y="11" font-family="'Inter', -apple-system, sans-serif" font-weight="900" font-size="12" fill="#0E4595" font-style="italic">VISA</text>
+        </svg>
+    `,
+    mastercard: `
+        <svg class="card-brand-logo visible" viewBox="0 0 24 16" width="24" height="16">
+            <circle cx="8" cy="8" r="8" fill="#EB001B" />
+            <circle cx="16" cy="8" r="8" fill="#F79E1B" fill-opacity="0.85" />
+        </svg>
+    `,
+    troy: `
+        <svg class="card-brand-logo visible" viewBox="0 0 36 14" width="36" height="14">
+            <text x="0" y="11" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="12" fill="#00A59B" font-style="italic">troy</text>
+        </svg>
+    `
+};
+
+// Luhn (Mod 10) Doğrulama Algoritması
+function validateLuhn(cardNumber) {
+    if (!cardNumber || cardNumber.length < 13 || cardNumber.length > 19) return false;
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = cardNumber.length - 1; i >= 0; i--) {
+        let digit = parseInt(cardNumber.charAt(i), 10);
+        if (isNaN(digit)) return false;
+        if (shouldDouble) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        shouldDouble = !shouldDouble;
+    }
+    return (sum % 10 === 0);
+}
 
 cardNumberInput.addEventListener('input', (e) => {
     let val = e.target.value.replace(/\D/g, '');
 
-    // Kart numarasına göre otomatik algılama (4 ile başlıyorsa Banka, 5 ile başlıyorsa Kredi Kartı)
+    // 1. Dinamik Kart Tipi Algılama ve Logo Değişimi
+    let brand = '';
     if (val.startsWith('4')) {
-        paymentTypeSelect.value = "2"; // Banka Kartı
+        brand = 'visa';
+        paymentTypeSelect.value = "2"; // Banka Kartı (Debit)
     } else if (val.startsWith('5')) {
+        brand = 'mastercard';
         paymentTypeSelect.value = "1"; // Kredi Kartı
+    } else if (val.startsWith('6')) {
+        brand = 'troy';
+        paymentTypeSelect.value = "2"; // Troy genellikle Banka Kartı (Debit) olarak kabul edilsin
     }
 
+    if (brand) {
+        cardLogoContainer.innerHTML = CARD_LOGOS[brand];
+    } else {
+        cardLogoContainer.innerHTML = '';
+    }
+
+    // 2. Formatlama (4'er haneli boşluk bırakarak)
     val = val.substring(0, 16);
     let formatted = val.replace(/(.{4})/g, '$1 ').trim();
     e.target.value = formatted;
+
+    // 3. Anlık Doğruluk Kontrolü (16 hane tamamlandığında kontrol et)
+    if (val.length === 16) {
+        if (!validateLuhn(val)) {
+            cardNumberError.classList.remove('hidden');
+            cardInputWrapper.classList.add('has-error');
+        } else {
+            cardNumberError.classList.add('hidden');
+            cardInputWrapper.classList.remove('has-error');
+        }
+    } else {
+        // Kullanıcı yazmaya devam ettiği sürece hata gösterme
+        cardNumberError.classList.add('hidden');
+        cardInputWrapper.classList.remove('has-error');
+    }
 });
+
 
 
 // ─── Expiry Date Formatting ───
@@ -99,23 +230,42 @@ expiryInput.addEventListener('input', (e) => {
 cardForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    const cardNumberRaw = cardNumberInput.value.replace(/\s/g, '');
+
     const payload = {
-        cardNumber: cardNumberInput.value.replace(/\s/g, ''),
+        cardNumber: cardNumberRaw,
         expiryDate: expiryInput.value,
         cvv: document.getElementById('cvv').value,
         amount: parseFloat(document.getElementById('cardAmount').value),
-        currency: document.getElementById('cardCurrency').value,
         transactionType: parseInt(document.getElementById('transactionType').value),
         paymentType: parseInt(document.getElementById('paymentType').value),
         channelTypeId: parseInt(document.getElementById('channelTypeId').value),
-        location: document.getElementById('cardLocation').value || 'Sanal POS',
+        location: document.getElementById('cardLocation').value || 'Ankara',
         country: document.getElementById('cardCountry').value || 'Türkiye',
-        merchantCategory: document.getElementById('merchantCategory').value,
+        merchantCategory: parseInt(document.getElementById('channelTypeId').value, 10) === 3
+            ? 'ATM / Nakit'
+            : document.getElementById('merchantCategory').value,
         rrn: rrnInput.value || null
     };
 
+    // 🟢 Gönderim öncesi son doğruluk kontrolü
+    if (!validateLuhn(cardNumberRaw)) {
+        cardNumberError.classList.remove('hidden');
+        cardInputWrapper.classList.add('has-error');
+
+        // Simülatör geçmişinde hata kaydı oluştur ve göster
+        addHistory({
+            isSuccess: false,
+            message: "Geçersiz Kart",
+            status: "Declined",
+            declineReason: "Girdiğiniz kart numarası Luhn (Mod 10) algoritma doğrulamasından geçemedi."
+        }, 'card', payload);
+        return;
+    }
+
     await sendRequest(`${API_BASE}/process`, payload, 'card', cardSubmitBtn);
 });
+
 
 // ─── Transfer Form Submit ───
 transferForm.addEventListener('submit', async (e) => {
@@ -138,7 +288,6 @@ transferForm.addEventListener('submit', async (e) => {
 // ─── Send API Request ───
 async function sendRequest(url, payload, type, btn) {
     btn.classList.add('loading');
-    hideResponse();
 
     try {
         const res = await fetch(url, {
@@ -151,10 +300,8 @@ async function sendRequest(url, payload, type, btn) {
         // ResponseDTO<T> wraps actual data inside "data" property
         const inner = raw.data || raw;
         const merged = { ...inner, message: raw.message, isSuccess: raw.isSuccess };
-        showResponse(merged, res.ok, type);
         addHistory(merged, type, payload);
     } catch (err) {
-        showErrorResponse(err.message);
         addHistory({ status: 'Error', message: err.message }, type, payload);
     } finally {
         btn.classList.remove('loading');
@@ -328,6 +475,10 @@ function addHistory(data, type, payload) {
 
     history.unshift(entry);
     if (history.length > 50) history.pop();
+
+    // En son gönderilen işlemi otomatik açalım
+    expandedHistoryId = entry.id;
+
     renderHistory();
 }
 
@@ -369,7 +520,10 @@ function renderHistory() {
         if (item.type === 'card') {
             if (p.cardNumber) detailRows += historyDetailRow('Kart No', maskCard(p.cardNumber));
             if (p.expiryDate) detailRows += historyDetailRow('Son Kullanma', p.expiryDate);
-            if (p.transactionType) detailRows += historyDetailRow('İşlem Tipi', p.transactionType === 1 ? 'Satış' : 'İade');
+            if (p.transactionType) {
+                const typeMap = { 1: 'Satış', 2: 'İade', 3: 'Para Yatırma', 4: 'Borç Ödeme' };
+                detailRows += historyDetailRow('İşlem Tipi', typeMap[p.transactionType] || p.transactionType);
+            }
             if (p.paymentType) detailRows += historyDetailRow('Ödeme Tipi', p.paymentType === 1 ? 'Kredi Kartı' : 'Banka Kartı');
             if (p.channelTypeId) detailRows += historyDetailRow('Kanal', getChannelName(p.channelTypeId));
             if (p.merchantCategory) detailRows += historyDetailRow('Kategori', p.merchantCategory);
@@ -388,10 +542,11 @@ function renderHistory() {
         if (r.rrn) detailRows += historyDetailRow('RRN', r.rrn);
         if (r.declineReason) detailRows += historyDetailRow('Red Sebebi', r.declineReason);
         if (r.fraudReason) detailRows += historyDetailRow('Fraud Nedeni', r.fraudReason);
-        if (r.message) detailRows += historyDetailRow('Mesaj', r.message);
+        if (r.message) detailRows += historyDetailRow('Mesaj', r.message, true); // 🟢 fullWidth = true
 
+        const isExpanded = item.id === expandedHistoryId;
         return `
-            <div class="history-item-wrapper" data-history-id="${item.id}">
+            <div class="history-item-wrapper ${isExpanded ? 'expanded' : ''}" data-history-id="${item.id}">
                 <div class="history-item" onclick="toggleHistoryDetail(${item.id})">
                     <div class="history-left">
                         <span class="history-type-badge ${item.type}">${item.type === 'card' ? 'KART' : 'EFT'}</span>
@@ -416,9 +571,9 @@ function renderHistory() {
     }).join('');
 }
 
-function historyDetailRow(label, value) {
+function historyDetailRow(label, value, fullWidth = false) {
     return `
-        <div class="history-detail-item">
+        <div class="history-detail-item ${fullWidth ? 'full-width' : ''}">
             <span class="history-detail-label">${label}</span>
             <span class="history-detail-value">${value}</span>
         </div>
@@ -442,10 +597,12 @@ function getChannelName(id) {
 }
 
 function toggleHistoryDetail(id) {
-    const wrapper = document.querySelector(`[data-history-id="${id}"]`);
-    if (wrapper) {
-        wrapper.classList.toggle('expanded');
+    if (expandedHistoryId === id) {
+        expandedHistoryId = null;
+    } else {
+        expandedHistoryId = id;
     }
+    renderHistory();
 }
 
 clearHistory.addEventListener('click', () => {

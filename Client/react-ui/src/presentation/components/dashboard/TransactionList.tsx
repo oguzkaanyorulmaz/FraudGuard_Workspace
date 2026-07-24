@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Transaction } from '../../../domain/entities/Transaction';
 import { TransactionRow } from './TransactionRow';
+import { MobileTransactionCard } from './MobileTransactionCard';
 
 interface Props {
     transactions: { transaction: Transaction; historyAction?: 'APPROVED' | 'BLOCKED' }[];
@@ -50,76 +51,97 @@ export const TransactionList: React.FC<Props> = ({
     if (transactions.length === 0) return <div className="bg-white border border-[#E4E7EB] rounded-xl p-16 text-center shadow-sm"><div className="text-slate-500 font-bold text-base"> {emptyMessage}</div></div>;
 
     return (
-        <div className="bg-white rounded-xl border border-[#E4E7EB] overflow-hidden shadow-sm">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-[#F8F9FA] text-[#718096] font-bold border-b border-[#E4E7EB] uppercase text-[11px] tracking-wider">
-                    <tr>
-                        <th className="p-4 w-12 text-center">
-                            {pendingIds.length > 0 && (
-                                <div className="custom-checkbox-cont justify-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={isAllSelected}
-                                        onChange={handleSelectAll}
-                                        className="custom-checkbox"
-                                    />
+        <>
+            {/* ═══ Masaüstü Tablo Görünümü ═══ */}
+            <div className="desktop-table bg-white rounded-xl border border-[#E4E7EB] overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-[#F8F9FA] text-[#718096] font-bold border-b border-[#E4E7EB] uppercase text-[11px] tracking-wider">
+                        <tr>
+                            <th className="p-4 w-12 text-center">
+                                {pendingIds.length > 0 && (
+                                    <div className="custom-checkbox-cont justify-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllSelected}
+                                            onChange={handleSelectAll}
+                                            className="custom-checkbox"
+                                        />
+                                    </div>
+                                )}
+                            </th>
+                            {renderSortHeader("Risk Skoru", "riskScore", "w-28")}
+                            {renderSortHeader("İşlem ID", "transactionId", "w-24")}
+                            <th className="p-4 w-44">Maskeli Kart</th>
+                            <th className="p-4 w-48 select-none">
+                                <div className="flex items-center gap-1.5">
+                                    <span
+                                        className="cursor-pointer hover:underline flex items-center gap-0.5"
+                                        onClick={() => onSort('amount')}
+                                    >
+                                        Tutar
+                                        <span className="text-[10px] text-gray-400 font-bold">
+                                            {(() => {
+                                                const s = sortFields.find(x => x.field === 'amount');
+                                                return s ? (s.direction === 'asc' ? '▲' : '▼') : '↕';
+                                            })()}
+                                        </span>
+                                    </span>
+                                    <span className="text-gray-300">/</span>
+                                    <span
+                                        className="cursor-pointer hover:underline flex items-center gap-0.5"
+                                        onClick={() => onSort('currency')}
+                                    >
+                                        Para Birimi
+                                        <span className="text-[10px] text-gray-400 font-bold">
+                                            {(() => {
+                                                const s = sortFields.find(x => x.field === 'currency');
+                                                return s ? (s.direction === 'asc' ? '▲' : '▼') : '↕';
+                                            })()}
+                                        </span>
+                                    </span>
                                 </div>
-                            )}
-                        </th>
-                        {renderSortHeader("Risk Skoru", "riskScore", "w-28")}
-                        {renderSortHeader("İşlem ID", "transactionId", "w-24")}
-                        <th className="p-4 w-44">Maskeli Kart</th>
-                        <th className="p-4 w-48 select-none">
-                            <div className="flex items-center gap-1.5">
-                                <span
-                                    className="cursor-pointer hover:underline flex items-center gap-0.5"
-                                    onClick={() => onSort('amount')}
-                                >
-                                    Tutar
-                                    <span className="text-[10px] text-gray-400 font-bold">
-                                        {(() => {
-                                            const s = sortFields.find(x => x.field === 'amount');
-                                            return s ? (s.direction === 'asc' ? '▲' : '▼') : '↕';
-                                        })()}
-                                    </span>
-                                </span>
-                                <span className="text-gray-300">/</span>
-                                <span
-                                    className="cursor-pointer hover:underline flex items-center gap-0.5"
-                                    onClick={() => onSort('currency')}
-                                >
-                                    Para Birimi
-                                    <span className="text-[10px] text-gray-400 font-bold">
-                                        {(() => {
-                                            const s = sortFields.find(x => x.field === 'currency');
-                                            return s ? (s.direction === 'asc' ? '▲' : '▼') : '↕';
-                                        })()}
-                                    </span>
-                                </span>
-                            </div>
-                        </th>
-                        {renderSortHeader("Tarih", "date", "w-40")}
-                        <th className="p-4 min-w-[250px] max-w-md">Şüphe Sebebi ve Kural</th>
-                        {renderSortHeader("Aksiyonlar", "action", "text-center w-48")}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800/60">
-                    {transactions.map(item => (
-                        <TransactionRow
-                            key={item.transaction.id}
-                            transaction={item.transaction}
-                            isSelected={selectedIds.includes(item.transaction.id)}
-                            isHistoryView={!!item.historyAction}
-                            historyAction={item.historyAction}
-                            onToggle={onToggleSelection}
-                            onApprove={onApprove}
-                            onBlock={onBlock}
-                            onViewDetails={onViewDetails}
-                            isExiting={exitingIds.includes(item.transaction.id)}
-                        />
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                            </th>
+                            {renderSortHeader("Tarih", "date", "w-40")}
+                            <th className="p-4 min-w-[250px] max-w-md">Şüphe Sebebi ve Kural</th>
+                            {renderSortHeader("Aksiyonlar", "action", "text-center w-48")}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60">
+                        {transactions.map(item => (
+                            <TransactionRow
+                                key={item.transaction.id}
+                                transaction={item.transaction}
+                                isSelected={selectedIds.includes(item.transaction.id)}
+                                isHistoryView={!!item.historyAction}
+                                historyAction={item.historyAction}
+                                onToggle={onToggleSelection}
+                                onApprove={onApprove}
+                                onBlock={onBlock}
+                                onViewDetails={onViewDetails}
+                                isExiting={exitingIds.includes(item.transaction.id)}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* ═══ Mobil Kart Görünümü ═══ */}
+            <div className="mobile-card-list">
+                {transactions.map(item => (
+                    <MobileTransactionCard
+                        key={item.transaction.id}
+                        transaction={item.transaction}
+                        isSelected={selectedIds.includes(item.transaction.id)}
+                        isHistoryView={!!item.historyAction}
+                        historyAction={item.historyAction}
+                        onToggle={onToggleSelection}
+                        onApprove={onApprove}
+                        onBlock={onBlock}
+                        onViewDetails={onViewDetails}
+                        isExiting={exitingIds.includes(item.transaction.id)}
+                    />
+                ))}
+            </div>
+        </>
     );
 };

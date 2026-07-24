@@ -14,6 +14,27 @@ interface Props {
     isExiting?: boolean;
 }
 
+const formatIdentifier = (val: string) => {
+    if (!val) return '';
+    const clean = val.replace(/[\s-]/g, '');
+    
+    // Check if it's an IBAN
+    if (clean.toUpperCase().startsWith('TR') || clean.length === 26) {
+        const upper = clean.toUpperCase();
+        if (upper.length === 26) {
+            return `${upper.slice(0, 4)} ${upper.slice(4, 8)} ${upper.slice(8, 12)} ${upper.slice(12, 16)} ${upper.slice(16, 20)} ${upper.slice(20, 24)} ${upper.slice(24, 26)}`;
+        }
+        return upper;
+    }
+    
+    // Check if it's a 16-digit Card number
+    if (clean.length === 16) {
+        return `${clean.slice(0, 4)} ${clean.slice(4, 8)} ${clean.slice(8, 12)} ${clean.slice(12, 16)}`;
+    }
+    
+    return val;
+};
+
 export const TransactionRow: React.FC<Props> = ({
     transaction, isSelected, isHistoryView, historyAction, onToggle, onApprove, onBlock, onViewDetails,
     isExiting = false
@@ -49,7 +70,7 @@ export const TransactionRow: React.FC<Props> = ({
                 </div>
             </td>
             <td className="p-4 font-mono text-gray-600">#{transaction.transactionId}</td>
-            <td className="p-4 font-mono text-black font-semibold">{transaction.maskedCard}</td>
+            <td className="p-4 font-mono text-black font-semibold">{formatIdentifier(transaction.maskedCard)}</td>
             <td className="p-4 font-black text-black">{transaction.money ? transaction.money.getFormatted() : '₺0.00'}</td>
             <td className="p-4 text-xs text-slate-600 font-medium">
                 {new Date(transaction.date).toLocaleString('tr-TR')}

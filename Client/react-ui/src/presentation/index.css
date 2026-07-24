@@ -118,3 +118,120 @@ body {
     animation: slideOutRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     pointer-events: none;
 }
+
+/* ═══════════════════════════════════════
+   Mobil Responsive — Tablo → Kart Dönüşümü
+   ═══════════════════════════════════════ */
+
+/* Masaüstünde kart gizli, tablo görünür */
+.mobile-card-list {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    /* Masaüstü tabloyu gizle */
+    .desktop-table {
+        display: none !important;
+    }
+
+    /* Mobil kart listesini göster */
+    .mobile-card-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* Mobil Kart Stili */
+    .mobile-txn-card {
+        background: white;
+        border: 1px solid #E4E7EB;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
+    }
+
+    .mobile-txn-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #FDBB30;
+    }
+
+    .mobile-txn-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.6rem;
+    }
+
+    .mobile-txn-card-header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .mobile-txn-card-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .mobile-txn-card-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+    }
+
+    .mobile-txn-card-field.full-width {
+        grid-column: span 2;
+    }
+
+    .mobile-txn-card-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .mobile-txn-card-value {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #1A1D20;
+        word-break: break-all;
+    }
+
+    .mobile-txn-card-actions {
+        display: flex;
+        gap: 0.5rem;
+        padding-top: 0.6rem;
+        border-top: 1px solid #E4E7EB;
+    }
+
+    .mobile-txn-card-actions button {
+        flex: 1;
+    }
+
+    /* Bulk Action Bar mobil */
+    .bulk-action-bar-mobile {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .bulk-action-bar-mobile .bulk-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .bulk-action-bar-mobile .bulk-buttons button {
+        width: 100% !important;
+    }
+
+    /* Sidebar tam ekran overlay */
+    .sidebar-mobile-fullscreen {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}

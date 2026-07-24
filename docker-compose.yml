@@ -24,7 +24,7 @@ services:
       - "5217:8080"
     environment:
       # Veritabanı adı FraudGuard ve şifre FraudGuard2026_! olarak güncellendi
-      - ConnectionStrings__DefaultConnection=Server=db;Database=FraudGuard;User Id=sa;Password=FraudGuard2026_!;TrustServerCertificate=True;
+      - ConnectionStrings__DefaultConnection=Server=db;Database=FraudGuard;User Id=sa;Password=FraudGuard2026_!;TrustServerCertificate=True;Application Name=FraudGuardAPI;
       - ConnectionStrings__RedisConnection=redis:6379
       - ASPNETCORE_ENVIRONMENT=Development
     depends_on:

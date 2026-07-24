@@ -380,6 +380,59 @@ namespace FraudGuard.Domain.Services
                         }
                     }
                 }
+                                    // 🟢 1. ATM PARA YATIRMA (Sadece Banka Kartlarında Bakiye Arttırır)
+                else if (input.TransactionType == TransactionTypeEnum.Deposit)
+                {
+                    if (isCredit)
+                    {
+                        result.Status = "Declined";
+                        result.DeclineReason = "Kredi kartına doğrudan para yatırılamaz. Lütfen Kredi Kartı Borç Ödeme seçeneğini kullanın.";
+                        return result;
+                    }
+
+                    // Banka kartı bakiyesini yatırılan tutar kadar arttır
+                    debitCard.Balance += processedAmount;
+                    await _debitCardRepository.UpdateAsync(debitCard);
+                    
+                    result.Status = "Approved"; // Para yatırma işlemi doğrudan onaylanır
+                    await _cacheProvider.RemoveAsync(cacheKey);
+                    await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
+                }
+                
+                // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
+                                // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
+                else if (input.TransactionType == TransactionTypeEnum.CardPayment)
+                {
+                    if (!isCredit)
+                    {
+                        result.Status = "Declined";
+                        result.DeclineReason = "Banka kartı için borç ödeme işlemi yapılamaz.";
+                        return result;
+                    }
+
+                    // Borç = Kart Limiti - Mevcut Kullanılabilir Limit
+                    decimal currentDebt = creditCard.CardLimit - creditCard.AvailableLimit;
+
+                    // Eğer yatırılmak istenen tutar mevcut borçtan fazlaysa işlemi doğrudan iptal et ve uyarı ver
+                    if (processedAmount > currentDebt)
+                    {
+                        result.Status = "Declined";
+                        result.DeclineReason = $"Borcunuz {currentDebt:N2} {input.Currency}'dir, fazla ödeme yapmayı denediniz.";
+                        return result;
+                    }
+
+                    // Borç ödemesini gerçekleştir (Kullanılabilir limiti arttır)
+                    creditCard.AvailableLimit += processedAmount;
+                    await _creditCardRepository.UpdateAsync(creditCard);
+
+                    result.Status = "Approved"; // Borç ödeme onaylanır
+                    await _cacheProvider.RemoveAsync(cacheKey);
+                    await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
+                }
+
+
+
+
 
                 int newTransactionId = 0;
                 string assignedRrn = input.TransactionType == TransactionTypeEnum.Refund ? input.RRN : GenerateRrn();

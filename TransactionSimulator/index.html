@@ -40,407 +40,427 @@
             </div>
         </header>
 
-        <!-- Tab Switcher -->
-        <div class="tab-switcher">
-            <button class="tab-btn active" data-tab="card" id="tabCard">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round">
-                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-                    <line x1="1" y1="10" x2="23" y2="10" />
-                </svg>
-                Kart İşlemi
-            </button>
-            <button class="tab-btn" data-tab="transfer" id="tabTransfer">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round">
-                    <line x1="12" y1="1" x2="12" y2="23" />
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-                Para Transferi
-            </button>
-            <div class="tab-slider" id="tabSlider"></div>
-        </div>
+        <!-- Main Layout Wrapper -->
+        <div class="main-layout">
+            <!-- Left Column: Form & Response -->
+            <div class="left-column">
+                <!-- Tab Switcher -->
+                <div class="tab-switcher">
+                    <button class="tab-btn active" data-tab="card" id="tabCard">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                            <line x1="1" y1="10" x2="23" y2="10" />
+                        </svg>
+                        Kart İşlemi
+                    </button>
+                    <button class="tab-btn" data-tab="transfer" id="tabTransfer">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                        Para Transferi
+                    </button>
+                    <div class="tab-slider" id="tabSlider"></div>
+                </div>
 
-        <!-- Card Transaction Form -->
-        <form class="form-card glass-card" id="cardForm">
-            <div class="form-section">
-                <h2 class="section-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-                        <line x1="1" y1="10" x2="23" y2="10" />
-                    </svg>
-                    Kart Bilgileri
-                </h2>
-                <div class="form-grid cols-3">
-                    <div class="form-group span-2">
-                        <label for="cardNumber">Kart Numarası</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
+                <!-- Card Transaction Form -->
+                <form class="form-card glass-card" id="cardForm">
+                    <div class="form-section">
+                        <h2 class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
                                 <line x1="1" y1="10" x2="23" y2="10" />
                             </svg>
-                            <input type="text" id="cardNumber" placeholder="5520 0000 0000 0001" maxlength="19"
-                                required>
+                            Kart Bilgileri
+                        </h2>
+                        <div class="form-grid cols-3">
+                            <div class="form-group span-2">
+                                <label for="cardNumber">Kart Numarası</label>
+                                <div class="input-wrapper has-logo">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                                        <line x1="1" y1="10" x2="23" y2="10" />
+                                    </svg>
+                                    <input type="text" id="cardNumber" placeholder="5520 0000 0000 0001" maxlength="19"
+                                        required>
+                                    <!-- 🟢 Logo Buraya Dinamik Olarak Eklenecek -->
+                                    <div id="cardLogoContainer" class="card-logo-container"></div>
+                                </div>
+                                <!-- 🟢 Hata Mesajı Alanı -->
+                                <div id="cardNumberError" class="input-error-msg hidden">Geçersiz Kart.</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="expiryDate">Son Kullanma</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                        <line x1="16" y1="2" x2="16" y2="6" />
+                                        <line x1="8" y1="2" x2="8" y2="6" />
+                                        <line x1="3" y1="10" x2="21" y2="10" />
+                                    </svg>
+                                    <input type="text" id="expiryDate" placeholder="AA/YY" maxlength="5" required>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="expiryDate">Son Kullanma</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                <line x1="16" y1="2" x2="16" y2="6" />
-                                <line x1="8" y1="2" x2="8" y2="6" />
-                                <line x1="3" y1="10" x2="21" y2="10" />
-                            </svg>
-                            <input type="text" id="expiryDate" placeholder="AA/YY" maxlength="5" required>
+
+
+                        <div class="form-grid cols-3">
+                            <div class="form-group">
+                                <label for="cvv">CVV</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                    <input type="password" id="cvv" placeholder="•••" maxlength="4" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="cardAmount">Tutar</label>
+                                <div class="input-wrapper">
+                                    <span class="input-icon-text" id="cardAmountSign">₺</span>
+                                    <input type="number" id="cardAmount" placeholder="0.00" step="0.01" min="0.01"
+                                        required>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="cardCurrency">Para Birimi</label>
+                                <div class="select-wrapper">
+                                    <select id="cardCurrency" required>
+                                        <option value="TRY">🇹🇷 TRY — Türk Lirası</option>
+                                        <option value="USD">🇺🇸 USD — Amerikan Doları</option>
+                                        <option value="EUR">🇪🇺 EUR — Euro</option>
+                                        <option value="GBP">🇬🇧 GBP — İngiliz Sterlini</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                </div>
-                <div class="form-grid cols-3">
-                    <div class="form-group">
-                        <label for="cvv">CVV</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                            </svg>
-                            <input type="password" id="cvv" placeholder="•••" maxlength="4" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="cardAmount">Tutar</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon-text" id="cardAmountSign">₺</span>
-                            <input type="number" id="cardAmount" placeholder="0.00" step="0.01" min="0.01" required>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="cardCurrency">Para Birimi</label>
-                        <div class="select-wrapper">
-                            <select id="cardCurrency" required>
-                                <option value="TRY">🇹🇷 TRY — Türk Lirası</option>
-                                <option value="USD">🇺🇸 USD — Amerikan Doları</option>
-                                <option value="EUR">🇪🇺 EUR — Euro</option>
-                                <option value="GBP">🇬🇧 GBP — İngiliz Sterlini</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h2 class="section-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3" />
-                        <path
-                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                    </svg>
-                    İşlem Detayları
-                </h2>
-                <div class="form-grid cols-3">
-                    <div class="form-group">
-                        <label for="transactionType">İşlem Tipi</label>
-                        <div class="select-wrapper">
-                            <select id="transactionType" required>
-                                <option value="1">💳 Satış İşlemi</option>
-                                <option value="2">↩️ İade İşlemi</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group" style="display: none;">
-                        <label for="paymentType">Ödeme Tipi</label>
-                        <div class="select-wrapper">
-                            <select id="paymentType" required>
-                                <option value="1">💎 Kredi Kartı</option>
-                                <option value="2">🏦 Banka Kartı</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-group" id="rrnGroup" style="display: none;">
-                        <label for="rrnInput">RRN (Referans No)</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                <polyline points="14 2 14 8 20 8" />
-                            </svg>
-                            <input type="text" id="rrnInput" placeholder="Örn: 260722154321" maxlength="12">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="channelTypeId">Kanal Tipi</label>
-                        <div class="select-wrapper">
-                            <select id="channelTypeId" required>
-                                <option value="1">🏪 Fiziksel POS</option>
-                                <option value="2" selected>🌐 Sanal POS</option>
-                                <option value="3">🏧 ATM Cihazı</option>
-                                <option value="4">📱 Mobil Şube</option>
-                                <option value="5">💻 İnternet Şubesi</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-grid cols-3">
-                    <div class="form-group">
-                        <label for="merchantCategory">İşyeri Kategorisi</label>
-                        <div class="select-wrapper">
-                            <select id="merchantCategory" required>
-                                <option value="E-Ticaret">🛒 E-Ticaret</option>
-                                <option value="Market">🏬 Market / Gıda</option>
-                                <option value="Giyim">👗 Giyim</option>
-                                <option value="Elektronik">📺 Elektronik</option>
-                                <option value="Restoran">🍽️ Restoran / Yemek</option>
-                                <option value="Seyahat">✈️ Seyahat</option>
-                                <option value="Konaklama">🏨 Konaklama</option>
-                                <option value="Kuyumcu">💍 Kuyumcu</option>
-                                <option value="Eğlence">🎭 Eğlence</option>
-                                <option value="Sağlık">🏥 Sağlık</option>
-                                <option value="Eğitim">📚 Eğitim</option>
-                                <option value="Akaryakıt">⛽ Akaryakıt</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="cardLocation">Lokasyon</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                <circle cx="12" cy="10" r="3" />
-                            </svg>
-                            <input type="text" id="cardLocation" placeholder="Lokasyon" value="Ankara">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="cardCountry">Ülke</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="2" y1="12" x2="22" y2="12" />
+                    <div class="form-section">
+                        <h2 class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3" />
                                 <path
-                                    d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                             </svg>
-                            <input type="text" id="cardCountry" placeholder="Türkiye" value="Türkiye">
+                            İşlem Detayları
+                        </h2>
+                        <div class="form-grid cols-3">
+                            <div class="form-group">
+                                <label for="transactionType">İşlem Tipi</label>
+                                <div class="select-wrapper">
+                                    <select id="transactionType" required>
+                                        <option value="1">💳 Satış İşlemi</option>
+                                        <option value="2">↩️ İade İşlemi</option>
+                                        <option value="3">📥 Para Yatırma</option>
+                                        <option value="4">💰 Kredi Kartı Borç Ödeme</option>
+                                    </select>
+
+                                </div>
+                            </div>
+                            <div class="form-group" style="display: none;">
+                                <label for="paymentType">Ödeme Tipi</label>
+                                <div class="select-wrapper">
+                                    <select id="paymentType" required>
+                                        <option value="1">💎 Kredi Kartı</option>
+                                        <option value="2">🏦 Banka Kartı</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="rrnGroup" style="display: none;">
+                                <label for="rrnInput">RRN (Referans No)</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                    <input type="text" id="rrnInput" placeholder="Örn: 260722154321" maxlength="12">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="channelTypeId">Kanal Tipi</label>
+                                <div class="select-wrapper">
+                                    <select id="channelTypeId" required>
+                                        <option value="1">🏪 Fiziksel POS</option>
+                                        <option value="2" selected>🌐 Sanal POS</option>
+                                        <option value="3">🏧 ATM Cihazı</option>
+                                        <option value="4">📱 Mobil Şube</option>
+                                        <option value="5">💻 İnternet Şubesi</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-grid cols-3">
+                            <div class="form-group">
+                                <label for="merchantCategory">İşyeri Kategorisi</label>
+                                <div class="select-wrapper">
+                                    <select id="merchantCategory" required>
+                                        <option value="E-Ticaret">🛒 E-Ticaret</option>
+                                        <option value="Market">🏬 Market / Gıda</option>
+                                        <option value="Giyim">👗 Giyim</option>
+                                        <option value="Elektronik">📺 Elektronik</option>
+                                        <option value="Restoran">🍽️ Restoran / Yemek</option>
+                                        <option value="Seyahat">✈️ Seyahat</option>
+                                        <option value="Konaklama">🏨 Konaklama</option>
+                                        <option value="Kuyumcu">💍 Kuyumcu</option>
+                                        <option value="Eğlence">🎭 Eğlence</option>
+                                        <option value="Sağlık">🏥 Sağlık</option>
+                                        <option value="Eğitim">📚 Eğitim</option>
+                                        <option value="Akaryakıt">⛽ Akaryakıt</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="cardLocation">Lokasyon</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                        <circle cx="12" cy="10" r="3" />
+                                    </svg>
+                                    <input type="text" id="cardLocation" placeholder="Lokasyon" value="Ankara">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="cardCountry">Ülke</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="2" y1="12" x2="22" y2="12" />
+                                        <path
+                                            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                    </svg>
+                                    <input type="text" id="cardCountry" placeholder="Türkiye" value="Türkiye">
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <button type="submit" class="submit-btn" id="cardSubmitBtn">
-                <span class="btn-text">İşlemi Gönder</span>
-                <span class="btn-loader">
-                    <svg class="spinner" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3"
-                            stroke-dasharray="40 60" />
-                    </svg>
-                </span>
-                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-            </button>
-        </form>
+                    <button type="submit" class="submit-btn" id="cardSubmitBtn">
+                        <span class="btn-text">İşlemi Gönder</span>
+                        <span class="btn-loader">
+                            <svg class="spinner" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3"
+                                    stroke-dasharray="40 60" />
+                            </svg>
+                        </span>
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                    </button>
+                </form>
 
-        <!-- Transfer Form -->
-        <form class="form-card glass-card hidden" id="transferForm">
-            <div class="form-section">
-                <h2 class="section-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 1l4 4-4 4" />
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                        <path d="M7 23l-4-4 4-4" />
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                    </svg>
-                    Gönderici Bilgileri
-                </h2>
-                <div class="form-grid cols-1">
-                    <div class="form-group">
-                        <label for="senderIBAN">Gönderici IBAN</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon-text iban-icon">TR</span>
-                            <input type="text" id="senderIBAN" placeholder="TR110006200000000001000004" maxlength="26"
-                                required>
+                <!-- Transfer Form -->
+                <form class="form-card glass-card hidden" id="transferForm">
+                    <div class="form-section">
+                        <h2 class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 1l4 4-4 4" />
+                                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                                <path d="M7 23l-4-4 4-4" />
+                                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                            </svg>
+                            Gönderici Bilgileri
+                        </h2>
+                        <div class="form-grid cols-1">
+                            <div class="form-group">
+                                <label for="senderIBAN">Gönderici IBAN</label>
+                                <div class="input-wrapper">
+                                    <span class="input-icon-text iban-icon">TR</span>
+                                    <input type="text" id="senderIBAN" placeholder="TR110006200000000001000004"
+                                        maxlength="26" required>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="form-section">
-                <h2 class="section-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                    </svg>
-                    Alıcı Bilgileri
-                </h2>
-                <div class="form-grid cols-2">
-                    <div class="form-group">
-                        <label for="receiverIBAN">Alıcı IBAN</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon-text iban-icon">TR</span>
-                            <input type="text" id="receiverIBAN" placeholder="TR110006200000000001000013" maxlength="26"
-                                required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="receiverName">Alıcı Adı</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
+                    <div class="form-section">
+                        <h2 class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                                 <circle cx="12" cy="7" r="4" />
                             </svg>
-                            <input type="text" id="receiverName" placeholder="Alıcı ismi" required>
+                            Alıcı Bilgileri
+                        </h2>
+                        <div class="form-grid cols-2">
+                            <div class="form-group">
+                                <label for="receiverIBAN">Alıcı IBAN</label>
+                                <div class="input-wrapper">
+                                    <span class="input-icon-text iban-icon">TR</span>
+                                    <input type="text" id="receiverIBAN" placeholder="TR110006200000000001000013"
+                                        maxlength="26" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="receiverName">Alıcı Adı</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                        <circle cx="12" cy="7" r="4" />
+                                    </svg>
+                                    <input type="text" id="receiverName" placeholder="Alıcı ismi" required>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="form-section">
-                <h2 class="section-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="1" x2="12" y2="23" />
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                    </svg>
-                    Transfer Detayları
-                </h2>
-                <div class="form-grid cols-2">
-                    <div class="form-group">
-                        <label for="transferAmount">Tutar</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon-text" id="transferAmountSign">₺</span>
-                            <input type="number" id="transferAmount" placeholder="0.00" step="0.01" min="0.01" required>
-                        </div>
-
-                    </div>
-                    <div class="form-group">
-                        <label for="transferCurrency">Para Birimi</label>
-                        <div class="select-wrapper">
-                            <select id="transferCurrency" required>
-                                <option value="TRY">🇹🇷 TRY — Türk Lirası</option>
-                                <option value="USD">🇺🇸 USD — Amerikan Doları</option>
-                                <option value="EUR">🇪🇺 EUR — Euro</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-grid cols-2">
-                    <div class="form-group">
-                        <label for="transferLocation">Lokasyon</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                <circle cx="12" cy="10" r="3" />
+                    <div class="form-section">
+                        <h2 class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23" />
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                             </svg>
-                            <input type="text" id="transferLocation" placeholder="Şehir" value="İstanbul">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="transferCountry">Ülke</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="2" y1="12" x2="22" y2="12" />
-                                <path
-                                    d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                            </svg>
-                            <input type="text" id="transferCountry" placeholder="Türkiye" value="Türkiye">
-                        </div>
-                    </div>
-                </div>
-                <div class="form-grid cols-1">
-                    <div class="form-group">
-                        <label for="description">Açıklama</label>
-                        <div class="input-wrapper">
-                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                <polyline points="14 2 14 8 20 8" />
-                                <line x1="16" y1="13" x2="8" y2="13" />
-                                <line x1="16" y1="17" x2="8" y2="17" />
-                            </svg>
-                            <input type="text" id="description" placeholder="Para transferi açıklaması"
-                                value="Para transferi">
-                        </div>
-                    </div>
-                </div>
-            </div>
+                            Transfer Detayları
+                        </h2>
+                        <div class="form-grid cols-2">
+                            <div class="form-group">
+                                <label for="transferAmount">Tutar</label>
+                                <div class="input-wrapper">
+                                    <span class="input-icon-text" id="transferAmountSign">₺</span>
+                                    <input type="number" id="transferAmount" placeholder="0.00" step="0.01" min="0.01"
+                                        required>
+                                </div>
 
-            <button type="submit" class="submit-btn" id="transferSubmitBtn">
-                <span class="btn-text">Transferi Gönder</span>
-                <span class="btn-loader">
-                    <svg class="spinner" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3"
-                            stroke-dasharray="40 60" />
-                    </svg>
-                </span>
-                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-            </button>
-        </form>
-
-        <!-- Response Area -->
-        <div class="response-area hidden" id="responseArea">
-            <div class="response-card glass-card" id="responseCard">
-                <div class="response-header" id="responseHeader">
-                    <div class="response-status" id="responseStatus">
-                        <span class="response-icon" id="responseIcon"></span>
-                        <span class="response-title" id="responseTitle">Sonuç</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="transferCurrency">Para Birimi</label>
+                                <div class="select-wrapper">
+                                    <select id="transferCurrency" required>
+                                        <option value="TRY">🇹🇷 TRY — Türk Lirası</option>
+                                        <option value="USD">🇺🇸 USD — Amerikan Doları</option>
+                                        <option value="EUR">🇪🇺 EUR — Euro</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-grid cols-2">
+                            <div class="form-group">
+                                <label for="transferLocation">Lokasyon</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                        <circle cx="12" cy="10" r="3" />
+                                    </svg>
+                                    <input type="text" id="transferLocation" placeholder="Şehir" value="İstanbul">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="transferCountry">Ülke</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="2" y1="12" x2="22" y2="12" />
+                                        <path
+                                            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                    </svg>
+                                    <input type="text" id="transferCountry" placeholder="Türkiye" value="Türkiye">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-grid cols-1">
+                            <div class="form-group">
+                                <label for="description">Açıklama</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                        <line x1="16" y1="13" x2="8" y2="13" />
+                                        <line x1="16" y1="17" x2="8" y2="17" />
+                                    </svg>
+                                    <input type="text" id="description" placeholder="Para transferi açıklaması"
+                                        value="Para transferi">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <button class="close-btn" id="closeResponse" title="Kapat">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
+
+                    <button type="submit" class="submit-btn" id="transferSubmitBtn">
+                        <span class="btn-text">Transferi Gönder</span>
+                        <span class="btn-loader">
+                            <svg class="spinner" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3"
+                                    stroke-dasharray="40 60" />
+                            </svg>
+                        </span>
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
                     </button>
-                </div>
-                <div class="response-body" id="responseBody"></div>
-            </div>
-        </div>
+                </form>
 
-        <!-- History -->
-        <div class="history-section" id="historySection">
-            <div class="history-header">
-                <h2>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    Son İşlemler
-                </h2>
-                <button class="clear-history-btn" id="clearHistory" title="Geçmişi Temizle">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                    Temizle
-                </button>
-            </div>
-            <div class="history-filter-tabs">
-                <button class="history-filter-btn active" data-filter="all" id="filterAll"
-                    onclick="setHistoryFilter('all')">
-                    📋 Tüm İşlemler
-                </button>
-                <button class="history-filter-btn" data-filter="suspicious" id="filterSuspicious"
-                    onclick="setHistoryFilter('suspicious')">
-                    ⚠️ Şüpheli İşlemler
-                </button>
-            </div>
-            <div class="history-list" id="historyList"></div>
-        </div>
-    </div>
+                <!-- Response Area -->
+                <div class="response-area hidden" id="responseArea">
+                    <div class="response-card glass-card" id="responseCard">
+                        <div class="response-header" id="responseHeader">
+                            <div class="response-status" id="responseStatus">
+                                <span class="response-icon" id="responseIcon"></span>
+                                <span class="response-title" id="responseTitle">Sonuç</span>
+                            </div>
+                            <button class="close-btn" id="closeResponse" title="Kapat">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="response-body" id="responseBody"></div>
+                    </div>
+                </div>
+            </div> <!-- Closes left-column -->
+
+            <!-- Right Column: History -->
+            <div class="right-column">
+                <!-- History -->
+                <div class="history-section" id="historySection">
+                    <div class="history-header">
+                        <h2>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            Son İşlemler
+                        </h2>
+                        <button class="clear-history-btn" id="clearHistory" title="Geçmişi Temizle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path
+                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
+                            Temizle
+                        </button>
+                    </div>
+                    <div class="history-filter-tabs">
+                        <button class="history-filter-btn active" data-filter="all" id="filterAll"
+                            onclick="setHistoryFilter('all')">
+                            📋 Tüm İşlemler
+                        </button>
+                        <button class="history-filter-btn" data-filter="suspicious" id="filterSuspicious"
+                            onclick="setHistoryFilter('suspicious')">
+                            ⚠️ Şüpheli İşlemler
+                        </button>
+                    </div>
+                    <div class="history-list" id="historyList"></div>
+                </div>
+            </div> <!-- Closes right-column -->
+        </div> <!-- Closes main-layout -->
+    </div> <!-- Closes container -->
 
     <script src="app.js"></script>
 </body>

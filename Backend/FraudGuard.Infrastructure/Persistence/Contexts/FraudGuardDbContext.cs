@@ -36,9 +36,11 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
 
             // 1. Transaction Types Seeding
             modelBuilder.Entity<ETransactionType>().HasData(
-    new ETransactionType { TransactionTypeId = 1, TypeCode = "Sale", Description = "Satış İşlemi" },
-    new ETransactionType { TransactionTypeId = 2, TypeCode = "Refund", Description = "İade İşlemi" }
-);
+                new ETransactionType { TransactionTypeId = 1, TypeCode = "Sale", Description = "Satış İşlemi" },
+                new ETransactionType { TransactionTypeId = 2, TypeCode = "Refund", Description = "İade İşlemi" },
+                new ETransactionType { TransactionTypeId = 3, TypeCode = "Deposit", Description = "Para Yatırma" },
+                new ETransactionType { TransactionTypeId = 4, TypeCode = "CardPayment", Description = "Kredi Kartı Borç Ödeme" }
+            );
 
 
             // 2. Fraud Rules Seeding
@@ -63,7 +65,10 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
                 new EFraudRule { RuleId = 18, RuleCode = "HIGH_RISK_RECEIVER", RuleName = "Şüpheli Alıcı/Katır Hesap", Description = "Gönderilen IBAN'ın sistemde kara listede olması", IsActive = true },
                 new EFraudRule { RuleId = 19, RuleCode = "MULTI_SENDER_TO_SINGLE_RECEIVER", RuleName = "Tek Alıcıya Çoklu Gönderim", Description = "Aynı alıcıya kısa sürede farklı kişilerden para transferi", IsActive = true },
                 new EFraudRule { RuleId = 20, RuleCode = "RECEIVER_BALANCE_ANOMALY", RuleName = "Katır Hesap Bakiye Sapması", Description = "Pasif hesaba ani bakiye gelip 1 saatte nakit çekilmeye çalışılması", IsActive = true },
-                new EFraudRule { RuleId = 22, RuleCode = "HIGH_VALUE_REFUND_VOID", RuleName = "Yüksek Tutarlı İade Kuralı", Description = "Tek seferde 10.000 TL ve üzerinde İade (Refund) işlemi yapılması", IsActive = true }
+                new EFraudRule { RuleId = 22, RuleCode = "HIGH_VALUE_REFUND_VOID", RuleName = "Yüksek Tutarlı İade Kuralı", Description = "Tek seferde 10.000 TL ve üzerinde İade (Refund) işlemi yapılması", IsActive = true },
+                new EFraudRule { RuleId = 23, RuleCode = "DEPOSIT_AND_RUN", RuleName = "Yatır ve Kaç Kuralı", Description = "Son 10 dakika içinde hesaba ATM'den para yatırıldıktan hemen sonra bu tutarın %90'ından fazlasının harcanmak istenmesi", IsActive = true },
+                new EFraudRule { RuleId = 24, RuleCode = "DEPOSIT_LIMIT_AVOIDANCE", RuleName = "Yapılandırılmış Aklama (Deposit Limit Avoidance)", Description = "Son 24 saat içinde 3 veya daha fazla farklı ATM'den toplamda 40.000 TL ve üzeri para yatırma denemesi", IsActive = true },
+                new EFraudRule { RuleId = 25, RuleCode = "ANOMALOUS_DEPOSIT_TIME", RuleName = "Gece Yarısı Nakit Akışı", Description = "Gece geç saatte (23:00-06:00) ATM'den 10.000 TL ve üzeri nakit para yatırılması", IsActive = true }
             );
 
             // 3. Block Reasons Seeding
@@ -76,17 +81,69 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
 
 
             // 5. Customers Seeding (1-45)
+            var nationalPlayers = new (string First, string Last)[] {
+                ("Arda", "Güler"),
+                ("Hakan", "Çalhanoğlu"),
+                ("Kenan", "Yıldız"),
+                ("Barış Alper", "Yılmaz"),
+                ("Kerem", "Aktürkoğlu"),
+                ("Ferdi", "Kadıoğlu"),
+                ("Merih", "Demiral"),
+                ("Abdülkerim", "Bardakcı"),
+                ("Uğurcan", "Çakır"),
+                ("Orkun", "Kökçü"),
+                ("İrfan Can", "Kahveci"),
+                ("Semih", "Kılıçsoy"),
+                ("Cenk", "Tosun"),
+                ("Yusuf", "Yazıcı"),
+                ("Zeki", "Çelik")
+            };
+
+            var firstNames = new string[] {
+                "Ahmet", "Mehmet", "Mustafa", "Ali", "Hüseyin", "Hasan", "İbrahim", "Halil", "Yusuf", "Murat",
+                "Ömer", "Zeynep", "Elif", "Merve", "Fatma", "Ayşe", "Emine", "Hatice", "Selin", "Esra",
+                "Gökhan", "Hakan", "Serkan", "Volkan", "Burak", "Can", "Cem", "Deniz", "Ege", "Kaan",
+                "Onur", "Umut", "Oğuz", "Yiğit", "Berkay", "Büşra", "Dilek", "Gamze", "Seda", "Sibel",
+                "Gizem", "Derya", "Hande", "Tuğba", "Pınar"
+            };
+            var lastNames = new string[] {
+                "Yılmaz", "Kaya", "Demir", "Çelik", "Şahin", "Yıldız", "Yıldırım", "Öztürk", "Aydın", "Özdemir",
+                "Arslan", "Doğan", "Kılıç", "Aslan", "Çetin", "Kara", "Koç", "Kurt", "Tekin", "Acar",
+                "Aksoy", "Polat", "Erdoğan", "Güler", "Şen", "Güneş", "Bulut", "Yalçın", "Altun", "Sarı",
+                "Avcı", "Eser", "Çakır", "Uysal", "Kartal", "Karahan", "Yavuz", "Şimşek", "Karaca", "Çakmak",
+                "Gök", "Duman", "Bozkurt", "Özcan", "Toprak"
+            };
+
             var customers = new List<ECustomer>();
+            int nationalIdx = 0;
             for (int i = 1; i <= 45; i++)
             {
+                string firstName;
+                string lastName;
+
+                // Her 3 müşteriden birini Milli Takım oyuncusu yapalım
+                if (i % 3 == 0 && nationalIdx < nationalPlayers.Length)
+                {
+                    firstName = nationalPlayers[nationalIdx].First;
+                    lastName = nationalPlayers[nationalIdx].Last;
+                    nationalIdx++;
+                }
+                else
+                {
+                    firstName = firstNames[(i - 1) % firstNames.Length];
+                    lastName = lastNames[(i - 1) % lastNames.Length];
+                }
+
+                string cleanEmailPrefix = firstName.Replace(" ", "").ToLower(System.Globalization.CultureInfo.InvariantCulture);
+
                 customers.Add(new ECustomer
                 {
                     CustomerId = i,
-                    FirstName = $"Musteri{i}",
-                    LastName = "Soyad",
+                    FirstName = firstName,
+                    LastName = lastName,
                     IdentityNumber = (10000000000 + i).ToString(),
                     PhoneNumber = $"+9055555555{i:D2}",
-                    Email = $"customer{i}@mail.com",
+                    Email = $"{cleanEmailPrefix}{i}@mail.com",
                     CreatedAt = new DateTime(2026, 7, 16)
                 });
             }
@@ -96,11 +153,13 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
             var creditCards = new List<ECreditCard>();
             for (int i = 1; i <= 45; i++)
             {
+                string prefix = $"55200000000{i:D4}";
+                int checkDigit = CalculateLuhnCheckDigit(prefix);
                 creditCards.Add(new ECreditCard
                 {
                     CardId = i,
                     CustomerId = i,
-                    CardNumber = $"552000000000{i:D4}",
+                    CardNumber = prefix + checkDigit,
                     ExpiryDate = "12/28",
                     CVV = $"{100 + i}",
                     CardLimit = 150000,
@@ -124,11 +183,13 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
             var debitCards = new List<EDebitCard>();
             for (int i = 1; i <= 45; i++)
             {
+                string prefix = $"46850000000{i:D4}";
+                int checkDigit = CalculateLuhnCheckDigit(prefix);
                 debitCards.Add(new EDebitCard
                 {
                     CardId = i,
                     CustomerId = i,
-                    CardNumber = $"468500000000{i:D4}",
+                    CardNumber = prefix + checkDigit,
                     ExpiryDate = "12/29",
                     CVV = $"{200 + i}",
                     Balance = 100000,
@@ -346,6 +407,24 @@ public DbSet<ETransferTransaction> TransferTransactions { get; set; }
                     Status = "Approved"
                 }
             );
+        }
+
+        private static int CalculateLuhnCheckDigit(string number)
+        {
+            int sum = 0;
+            bool shouldDouble = true;
+            for (int i = number.Length - 1; i >= 0; i--)
+            {
+                int digit = number[i] - '0';
+                if (shouldDouble)
+                {
+                    digit *= 2;
+                    if (digit > 9) digit -= 9;
+                }
+                sum += digit;
+                shouldDouble = !shouldDouble;
+            }
+            return (10 - (sum % 10)) % 10;
         }
     }
 }

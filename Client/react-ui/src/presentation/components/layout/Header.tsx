@@ -8,24 +8,25 @@ export const Header: React.FC = () => {
     return (
         <>
             <div className="w-full bg-[#FDBB30] border-b border-[#E5A520]/80 shadow-md">
-                <div className="w-full px-4 py-3.5 md:px-8 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2.5 font-sans">
-                            <span className="bg-[#111111] text-[#FDBB30] font-black italic text-xl px-2.5 py-0.5 rounded shadow-sm">FG</span>
-                            <span className="text-xl font-extrabold tracking-tight text-[#111111]">FraudGuard</span>
+                <div className="w-full px-3 py-2.5 md:px-8 md:py-3.5 flex justify-between items-center">
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="flex items-center gap-1.5 md:gap-2.5 font-sans">
+                            <span className="bg-[#111111] text-[#FDBB30] font-black italic text-lg md:text-xl px-2 md:px-2.5 py-0.5 rounded shadow-sm">FG</span>
+                            <span className="text-base md:text-xl font-extrabold tracking-tight text-[#111111]">FraudGuard</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-3">
                         {user && (
                             <>
-                                <div className="flex items-center gap-2 bg-[#111111]/10 text-[#111111] px-4 py-1.5 rounded-lg text-xs font-bold border border-[#111111]/20">
+                                <div className="hidden md:flex items-center gap-2 bg-[#111111]/10 text-[#111111] px-4 py-1.5 rounded-lg text-xs font-bold border border-[#111111]/20">
                                     <span>👤 Kullanıcı: {user.username}</span>
                                 </div>
                                 <button 
                                     onClick={() => setShowConfirm(true)} 
-                                    className="bg-[#111111] hover:bg-black text-white px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-sm"
+                                    className="bg-[#111111] hover:bg-black text-white px-3 md:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-sm"
                                 >
-                                    Çıkış Yap
+                                    <span className="hidden md:inline">Çıkış Yap</span>
+                                    <span className="md:hidden">🚪</span>
                                 </button>
                             </>
                         )}

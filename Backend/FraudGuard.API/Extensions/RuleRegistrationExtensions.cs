@@ -28,6 +28,9 @@ namespace FraudGuard.API.Extensions
             services.AddScoped<IFraudRule, SuspiciousDescriptionRule>();
             services.AddScoped<IFraudRule, HighRiskReceiverRule>();
             services.AddScoped<IFraudRule, ReceiverBalanceAnomalyRule>();
+            services.AddScoped<IFraudRule, DepositAndRunRule>();
+            services.AddScoped<IFraudRule, DepositLimitAvoidanceRule>();
+            services.AddScoped<IFraudRule, AnomalousDepositTimeRule>();
 
             return services;
         }
