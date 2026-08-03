@@ -380,8 +380,7 @@ namespace FraudGuard.Domain.Services
                         }
                     }
                 }
-                                    // 🟢 1. ATM PARA YATIRMA (Sadece Banka Kartlarında Bakiye Arttırır)
-                                // 🟢 1. ATM PARA YATIRMA (Sadece Banka Kartlarında Bakiye Arttırır)
+
                 else if (input.TransactionType == TransactionTypeEnum.Deposit)
                 {
                     if (isCredit)
@@ -416,9 +415,7 @@ namespace FraudGuard.Domain.Services
                 }
 
                 
-                // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
-                                // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
-                                // 🟢 2. KREDİ KARTI BORÇ ÖDEME (Sadece Kredi Kartlarında Kullanılabilir Limiti Arttırır)
+
                 else if (input.TransactionType == TransactionTypeEnum.CardPayment)
                 {
                     if (!isCredit)

@@ -14,7 +14,6 @@ namespace FraudGuard.Domain.Interfaces.Entities
         string? ReceiverIBAN { get; }
         string? ReceiverName { get; }
         string? Description { get; }
-        
         int TransactionTypeId { get; } 
         PaymentTypeEnum PaymentType { get; }
         int ChannelTypeId { get; }
@@ -27,7 +26,6 @@ namespace FraudGuard.Domain.Interfaces.Entities
         string Status { get; set; }
         string? DeclineReason { get; set; }
         string? FraudReason { get; set; }
-        
         EFraudLog? FraudLog { get; }
     }
 }
