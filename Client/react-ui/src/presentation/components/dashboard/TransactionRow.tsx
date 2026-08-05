@@ -11,7 +11,6 @@ interface Props {
     onApprove: (id: string) => void;
     onBlock: (id: string) => void;
     onViewDetails: (txn: Transaction) => void;
-    isExiting?: boolean;
 }
 
 const formatIdentifier = (val: string) => {
@@ -35,16 +34,15 @@ const formatIdentifier = (val: string) => {
     return val;
 };
 
-export const TransactionRow: React.FC<Props> = ({
-    transaction, isSelected, isHistoryView, historyAction, onToggle, onApprove, onBlock, onViewDetails,
-    isExiting = false
+export const TransactionRow: React.FC<Props> = React.memo(({
+    transaction, isSelected, isHistoryView, historyAction, onToggle, onApprove, onBlock, onViewDetails
 }) => {
     const { user } = useAuth();
     const isAnalyst = user?.role === 3;
     const scoreValue = transaction.riskScore ?? 0;
     const isHighRisk = scoreValue >= 70;
 
-    const animationClass = isExiting ? 'row-exit' : 'row-enter';
+    const animationClass = 'row-enter';
 
     return (
         <tr className={`hover:bg-[#F8F9FA] transition-all duration-150 border-b border-[#E4E7EB] ${isSelected ? 'bg-[#FFC72C]/5' : ''} ${animationClass}`}>
@@ -146,4 +144,4 @@ export const TransactionRow: React.FC<Props> = ({
             </td>
         </tr>
     );
-};
+});

@@ -8,7 +8,7 @@ interface Props {
     onBulkApprove: () => void;
 }
 
-export const BulkActionBar: React.FC<Props> = ({ selectedCount, onBulkBlock, onClear, onBulkApprove }) => {
+export const BulkActionBar: React.FC<Props> = React.memo(({ selectedCount, onBulkBlock, onClear, onBulkApprove }) => {
     const { user } = useAuth();
     const isAnalyst = user?.role === 3;
 
@@ -81,4 +81,4 @@ export const BulkActionBar: React.FC<Props> = ({ selectedCount, onBulkBlock, onC
             </div>
         </div>
     );
-};
+});

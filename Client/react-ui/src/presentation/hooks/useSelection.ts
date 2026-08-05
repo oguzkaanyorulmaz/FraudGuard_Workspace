@@ -1,23 +1,23 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 export function useSelection(initialIds: string[] = []) {
     const [selectedIds, setSelectedIds] = useState<string[]>(initialIds);
 
-    const toggleSelection = (id: string) => {
+    const toggleSelection = useCallback((id: string) => {
         setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
         );
-    };
+    }, []);
 
-    const selectAll = (ids: string[]) => {
+    const selectAll = useCallback((ids: string[]) => {
         setSelectedIds(ids);
-    };
+    }, []);
 
-    const clearSelection = () => {
+    const clearSelection = useCallback(() => {
         setSelectedIds([]);
-    };
+    }, []);
 
-    const isSelected = (id: string) => selectedIds.includes(id);
+    const isSelected = useCallback((id: string) => selectedIds.includes(id), [selectedIds]);
 
     return {
         selectedIds,
@@ -26,4 +26,4 @@ export function useSelection(initialIds: string[] = []) {
         clearSelection,
         isSelected
     };
-}
+}

@@ -89,38 +89,8 @@ body {
     }
 }
 
-/* Çıkış Animasyonu (Sağa Doğru Kayıp Yok Olma ve Yükseklik Küçültme) */
-@keyframes slideOutRight {
-    0% {
-        opacity: 1;
-        transform: translateX(0);
-        line-height: normal;
-    }
-
-    50% {
-        opacity: 0;
-        transform: translateX(100px);
-    }
-
-    100% {
-        opacity: 0;
-        transform: translateX(100px);
-        height: 0;
-        padding-top: 0;
-        padding-bottom: 0;
-        border: none;
-        line-height: 0;
-        display: none;
-    }
-}
-
 .row-enter {
     animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.row-exit {
-    animation: slideOutRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    pointer-events: none;
 }
 
 /* ═══════════════════════════════════════

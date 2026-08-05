@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { Transaction } from '../domain/entities/Transaction';
 import { Header } from './components/layout/Header';
 import { TransactionList } from './components/dashboard/TransactionList';
@@ -13,12 +13,10 @@ import { LoginPage } from './components/auth/LoginPage';
 import { SearchableSelect } from './components/common/SearchableSelect';
 
 
-/* bg-[#F4F5F7] text-[#1A1D20] selection:bg-[#FFCB05] bg-white border-[#E4E7EB] shadow-sm 
-  text-xs text-[#718096] text-4xl text-[#111111] bg-[#E4E7EB] bg-[#111111] 
-  text-white border-[#C5CBD3] focus:ring-[#FFCB05]/20 
-*/
-
-
+const matchScenario = (txn: Transaction, scenario: string): boolean => {
+    if (scenario === 'ALL') return true;
+    return txn.ruleCode === scenario;
+};
 
 function Dashboard() {
     const { transactions, history, loading, handleApprove, handleBlock, handleBulkBlock, handleBulkApprove } = useTransactions();
@@ -32,7 +30,6 @@ function Dashboard() {
     // Ödeme Tipi State'i
     const [selectedPaymentType, setSelectedPaymentType] = useState<string>('ALL');
 
-    // Ödeme Tipine Göre Gruplanmış Senaryolar
     // Ödeme Tipine Göre Gruplanmış Senaryolar
     const paymentTypeScenarios: Record<string, { value: string; label: string }[]> = {
         ALL: [
@@ -57,7 +54,6 @@ function Dashboard() {
             { value: 'HIGH_RISK_RECEIVER', label: 'Yüksek Riskli Alıcı' },
             { value: 'RECEIVER_BALANCE_ANOMALY', label: 'Katır Hesap Bakiye Sapması' },
             { value: 'MULTI_SENDER_TO_SINGLE_RECEIVER', label: 'Tek Alıcıya Çoklu Gönderim (Multi-Sender)' },
-            // 📥 ATM Para Yatırma ve Harcama Yeni Kuralları
             { value: 'DEPOSIT_AND_RUN', label: 'Yatır ve Kaç Kuralı (Deposit and Run)' },
             { value: 'DEPOSIT_LIMIT_AVOIDANCE', label: 'Yapılandırılmış Aklama (Deposit Limit Avoidance)' },
             { value: 'ANOMALOUS_DEPOSIT_TIME', label: 'Gece Yarısı Nakit Akışı (Anomalous Deposit)' }
@@ -87,7 +83,6 @@ function Dashboard() {
             { value: 'VELOCITY', label: 'Hız/Sıklık Kuralı (Velocity)' },
             { value: 'CONSECUTIVE_REFUNDS', label: 'Ardışık İade Kuralı (Consecutive Refunds)' },
             { value: 'HIGH_VALUE_REFUND_VOID', label: 'Yüksek Tutarlı İade (High Value Refund)' },
-            // 📥 Banka Kartı İçin Yeni Eklenen ATM Kuralları
             { value: 'DEPOSIT_AND_RUN', label: 'Yatır ve Kaç Kuralı (Deposit and Run)' },
             { value: 'DEPOSIT_LIMIT_AVOIDANCE', label: 'Yapılandırılmış Aklama (Deposit Limit Avoidance)' },
             { value: 'ANOMALOUS_DEPOSIT_TIME', label: 'Gece Yarısı Nakit Akışı (Anomalous Deposit)' }
@@ -112,7 +107,7 @@ function Dashboard() {
         { field: 'date', direction: 'desc' }
     ]);
 
-    const handleSort = (field: string) => {
+    const handleSort = useCallback((field: string) => {
         setSortFields(prev => {
             const isCompositeField = field === 'amount' || field === 'currency';
 
@@ -139,7 +134,7 @@ function Dashboard() {
                 return [...newSorts, { field, direction: 'asc' as 'asc' | 'desc' }];
             }
         });
-    };
+    }, []);
 
 
     // Modal ve Sidebar Durumları
@@ -147,54 +142,37 @@ function Dashboard() {
     const [actionType, setActionType] = useState<'APPROVE' | 'BLOCK' | 'BULK_BLOCK' | 'BULK_APPROVE' | null>(null);
     const [selectedTxnId, setSelectedTxnId] = useState<string | null>(null);
     const [sidebarTxn, setSidebarTxn] = useState<Transaction | null>(null);
-    const [exitingTxnIds, setExitingTxnIds] = useState<string[]>([]);
 
-    const openApproveModal = (id: string) => { setSelectedTxnId(id); setActionType('APPROVE'); setIsModalOpen(true); };
-    const openBlockModal = (id: string) => { setSelectedTxnId(id); setActionType('BLOCK'); setIsModalOpen(true); };
-    const openBulkBlockModal = () => { setActionType('BULK_BLOCK'); setIsModalOpen(true); };
-    const openBulkApproveModal = () => { setActionType('BULK_APPROVE'); setIsModalOpen(true); };
+    const openApproveModal = useCallback((id: string) => { setSelectedTxnId(id); setActionType('APPROVE'); setIsModalOpen(true); }, []);
+    const openBlockModal = useCallback((id: string) => { setSelectedTxnId(id); setActionType('BLOCK'); setIsModalOpen(true); }, []);
+    const openBulkBlockModal = useCallback(() => { setActionType('BULK_BLOCK'); setIsModalOpen(true); }, []);
+    const openBulkApproveModal = useCallback(() => { setActionType('BULK_APPROVE'); setIsModalOpen(true); }, []);
 
-    const handleModalConfirm = (id: string, reason: string, blockReasonId?: number, analystName?: string) => {
+    const handleModalConfirm = useCallback((id: string, reason: string, blockReasonId?: number, analystName?: string) => {
         setIsModalOpen(false);
         const currentAction = actionType;
         setActionType(null);
         setSelectedTxnId(null);
 
         if (currentAction === 'APPROVE') {
-            setExitingTxnIds(prev => [...prev, id]);
-            setTimeout(() => {
-                handleApprove(id, reason, analystName);
-                setExitingTxnIds(prev => prev.filter(x => x !== id));
-            }, 400);
+            handleApprove(id, reason, analystName);
         }
         else if (currentAction === 'BLOCK') {
-            setExitingTxnIds(prev => [...prev, id]);
-            setTimeout(() => {
-                handleBlock(id, reason, blockReasonId, analystName);
-                setExitingTxnIds(prev => prev.filter(x => x !== id));
-            }, 400);
+            handleBlock(id, reason, blockReasonId, analystName);
         }
         else if (currentAction === 'BULK_BLOCK') {
             const targets = [...selectedIds];
-            setExitingTxnIds(prev => [...prev, ...targets]);
-            setTimeout(() => {
-                handleBulkBlock(targets, reason, blockReasonId, analystName);
-                clearSelection();
-                setExitingTxnIds(prev => prev.filter(x => !targets.includes(x)));
-            }, 400);
+            handleBulkBlock(targets, reason, blockReasonId, analystName);
+            clearSelection();
         }
         else if (currentAction === 'BULK_APPROVE') {
             const targets = [...selectedIds];
-            setExitingTxnIds(prev => [...prev, ...targets]);
-            setTimeout(() => {
-                handleBulkApprove(targets, reason, analystName);
-                clearSelection();
-                setExitingTxnIds(prev => prev.filter(x => !targets.includes(x)));
-            }, 400);
+            handleBulkApprove(targets, reason, analystName);
+            clearSelection();
         }
-    };
+    }, [actionType, selectedIds, handleApprove, handleBlock, handleBulkBlock, handleBulkApprove, clearSelection]);
 
-    const toggleTab = (tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
+    const toggleTab = useCallback((tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
         setSelectedTabs(prev => {
             if (prev.includes(tab)) {
                 if (prev.length === 1) return prev; // En az bir tanesi seçili kalsın
@@ -203,60 +181,65 @@ function Dashboard() {
                 return [...prev, tab];
             }
         });
-    };
+    }, []);
 
-    const handleTopCardClick = (tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
+    const handleTopCardClick = useCallback((tab: 'PENDING' | 'BLOCKED' | 'APPROVED') => {
         setSelectedTabs([tab]);
         setSelectedScenario('ALL');
         setSelectedPaymentType('ALL');
         clearSelection();
-    };
+    }, [clearSelection]);
 
-    const matchScenario = (txn: Transaction, scenario: string): boolean => {
-        if (scenario === 'ALL') return true;
-        return txn.ruleCode === scenario;
-    };
-
-    const getFilteredTransactions = () => {
+    const filteredPending = useMemo(() => {
         return transactions.filter(txn => {
             if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
             if (selectedPaymentType !== 'ALL' && txn.paymentType !== selectedPaymentType) return false;
             if (!matchScenario(txn, selectedScenario)) return false;
             return true;
         });
-    };
+    }, [transactions, searchTerm, selectedPaymentType, selectedScenario]);
 
-    const getFilteredHistory = (action: 'APPROVED' | 'BLOCKED') => {
+    const filteredBlocked = useMemo(() => {
         return history.filter(h => {
-            if (h.action !== action) return false;
+            if (h.action !== 'BLOCKED') return false;
             const txn = h.transaction;
             if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
             if (selectedPaymentType !== 'ALL' && txn.paymentType !== selectedPaymentType) return false;
             if (!matchScenario(txn, selectedScenario)) return false;
             return true;
         });
-    };
+    }, [history, searchTerm, selectedPaymentType, selectedScenario]);
+
+    const filteredApproved = useMemo(() => {
+        return history.filter(h => {
+            if (h.action !== 'APPROVED') return false;
+            const txn = h.transaction;
+            if (searchTerm && !txn.id.includes(searchTerm) && !txn.maskedCard.includes(searchTerm)) return false;
+            if (selectedPaymentType !== 'ALL' && txn.paymentType !== selectedPaymentType) return false;
+            if (!matchScenario(txn, selectedScenario)) return false;
+            return true;
+        });
+    }, [history, searchTerm, selectedPaymentType, selectedScenario]);
 
     // Filtreleme ve Sıralama Mantığı
-    const getFilteredData = () => {
+    const filteredData = useMemo(() => {
         let sourceData: { transaction: Transaction; historyAction?: 'APPROVED' | 'BLOCKED' }[] = [];
 
         if (selectedTabs.includes('PENDING')) {
-            sourceData = [...sourceData, ...getFilteredTransactions().map(t => ({ transaction: t }))];
+            sourceData = [...sourceData, ...filteredPending.map(t => ({ transaction: t }))];
         }
         if (selectedTabs.includes('BLOCKED')) {
             sourceData = [
                 ...sourceData,
-                ...getFilteredHistory('BLOCKED').map(h => ({ transaction: h.transaction, historyAction: 'BLOCKED' as const }))
+                ...filteredBlocked.map(h => ({ transaction: h.transaction, historyAction: 'BLOCKED' as const }))
             ];
         }
         if (selectedTabs.includes('APPROVED')) {
             sourceData = [
                 ...sourceData,
-                ...getFilteredHistory('APPROVED').map(h => ({ transaction: h.transaction, historyAction: 'APPROVED' as const }))
+                ...filteredApproved.map(h => ({ transaction: h.transaction, historyAction: 'APPROVED' as const }))
             ];
         }
-
 
         return [...sourceData].sort((a, b) => {
             for (const sort of sortFields) {
@@ -297,28 +280,7 @@ function Dashboard() {
             }
             return 0;
         });
-    };
-
-
-    const [visibleItems, setVisibleItems] = useState<{ transaction: Transaction; historyAction?: 'APPROVED' | 'BLOCKED' }[]>([]);
-
-    useEffect(() => {
-        const nextData = getFilteredData();
-        const nextIds = new Set(nextData.map(item => item.transaction.id));
-        const exiting = visibleItems.filter(item => !nextIds.has(item.transaction.id));
-
-        if (exiting.length > 0 && visibleItems.length > 0) {
-            const exitingIds = exiting.map(item => item.transaction.id);
-            setExitingTxnIds(prev => [...new Set([...prev, ...exitingIds])]);
-            const timer = setTimeout(() => {
-                setVisibleItems(nextData);
-                setExitingTxnIds(prev => prev.filter(id => !exitingIds.includes(id)));
-            }, 400);
-            return () => clearTimeout(timer);
-        } else {
-            setVisibleItems(nextData);
-        }
-    }, [transactions, history, selectedTabs, searchTerm, selectedScenario, selectedPaymentType, sortFields]);
+    }, [filteredPending, filteredBlocked, filteredApproved, selectedTabs, sortFields]);
 
     const isPendingActive = selectedTabs.length === 1 && selectedTabs.includes('PENDING');
     const isBlockedActive = selectedTabs.length === 1 && selectedTabs.includes('BLOCKED');
@@ -389,19 +351,19 @@ function Dashboard() {
                                 onClick={() => toggleTab('PENDING')}
                                 className={selectedTabs.includes('PENDING') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
-                                📂 Bekleyen ({getFilteredTransactions().length})
+                                📂 Bekleyen ({filteredPending.length})
                             </button>
                             <button
                                 onClick={() => toggleTab('BLOCKED')}
                                 className={selectedTabs.includes('BLOCKED') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
-                                🚫 Blokelenen ({getFilteredHistory('BLOCKED').length})
+                                🚫 Blokelenen ({filteredBlocked.length})
                             </button>
                             <button
                                 onClick={() => toggleTab('APPROVED')}
                                 className={selectedTabs.includes('APPROVED') ? theme.styles.tabActive : theme.styles.tabInactive}
                             >
-                                ✅ Onaylanan ({getFilteredHistory('APPROVED').length})
+                                ✅ Onaylanan ({filteredApproved.length})
                             </button>
                         </div>
 
@@ -483,7 +445,7 @@ function Dashboard() {
                 </div>
 
                 <TransactionList
-                    transactions={visibleItems}
+                    transactions={filteredData}
                     loading={loading}
                     selectedIds={selectedIds}
                     onToggleSelection={toggleSelection}
@@ -493,7 +455,6 @@ function Dashboard() {
                     onViewDetails={setSidebarTxn}
                     sortFields={sortFields}
                     onSort={handleSort}
-                    exitingIds={exitingTxnIds}
                     emptyMessage={getEmptyMessage()}
                 />
 

@@ -14,13 +14,12 @@ interface Props {
     onViewDetails: (txn: Transaction) => void;
     sortFields: { field: string; direction: 'asc' | 'desc' }[];
     onSort: (field: string) => void;
-    exitingIds: string[];
     emptyMessage: string;
 }
 
-export const TransactionList: React.FC<Props> = ({
+export const TransactionList: React.FC<Props> = React.memo(({
     transactions, loading, selectedIds, onToggleSelection, onSelectAll, onApprove, onBlock, onViewDetails,
-    sortFields, onSort, exitingIds, emptyMessage
+    sortFields, onSort, emptyMessage
 }) => {
     const pendingIds = transactions.filter(t => !t.historyAction).map(t => t.transaction.id);
     const isAllSelected = pendingIds.length > 0 && pendingIds.every(id => selectedIds.includes(id));
@@ -118,7 +117,6 @@ export const TransactionList: React.FC<Props> = ({
                                 onApprove={onApprove}
                                 onBlock={onBlock}
                                 onViewDetails={onViewDetails}
-                                isExiting={exitingIds.includes(item.transaction.id)}
                             />
                         ))}
                     </tbody>
@@ -138,10 +136,9 @@ export const TransactionList: React.FC<Props> = ({
                         onApprove={onApprove}
                         onBlock={onBlock}
                         onViewDetails={onViewDetails}
-                        isExiting={exitingIds.includes(item.transaction.id)}
                     />
                 ))}
             </div>
         </>
     );
-};
+});

@@ -11,7 +11,6 @@ interface Props {
     onApprove: (id: string) => void;
     onBlock: (id: string) => void;
     onViewDetails: (txn: Transaction) => void;
-    isExiting?: boolean;
 }
 
 const formatIdentifier = (val: string) => {
@@ -30,15 +29,14 @@ const formatIdentifier = (val: string) => {
     return val;
 };
 
-export const MobileTransactionCard: React.FC<Props> = ({
-    transaction, isSelected, isHistoryView, historyAction, onToggle, onApprove, onBlock, onViewDetails,
-    isExiting = false
+export const MobileTransactionCard: React.FC<Props> = React.memo(({
+    transaction, isSelected, isHistoryView, historyAction, onToggle, onApprove, onBlock, onViewDetails
 }) => {
     const { user } = useAuth();
     const isAnalyst = user?.role === 3;
     const scoreValue = transaction.riskScore ?? 0;
     const isHighRisk = scoreValue >= 70;
-    const animationClass = isExiting ? 'row-exit' : 'row-enter';
+    const animationClass = 'row-enter';
 
     return (
         <div className={`mobile-txn-card ${animationClass} ${isSelected ? 'border-[#FFC72C] bg-[#FFC72C]/5' : ''}`}>
@@ -146,4 +144,4 @@ export const MobileTransactionCard: React.FC<Props> = ({
             </div>
         </div>
     );
-};
+});
