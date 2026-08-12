@@ -23,7 +23,7 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             builder.Property(t => t.FraudReason).HasMaxLength(250);
 
             builder.HasOne(t => t.ChannelType)
-                   .WithMany()
+                   .WithMany(ct => ct.TransferTransactions)
                    .HasForeignKey(t => t.ChannelTypeId)
                    .OnDelete(DeleteBehavior.Restrict);
         }

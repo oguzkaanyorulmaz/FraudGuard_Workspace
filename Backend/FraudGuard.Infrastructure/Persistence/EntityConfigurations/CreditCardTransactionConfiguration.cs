@@ -25,12 +25,12 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
                    .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(t => t.TransactionType)
-                   .WithMany()
+                   .WithMany(tt => tt.CreditCardTransactions)
                    .HasForeignKey(t => t.TransactionTypeId)
                    .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(t => t.ChannelType)
-                   .WithMany()
+                   .WithMany(ct => ct.CreditCardTransactions)
                    .HasForeignKey(t => t.ChannelTypeId)
                    .OnDelete(DeleteBehavior.Restrict);
         }
