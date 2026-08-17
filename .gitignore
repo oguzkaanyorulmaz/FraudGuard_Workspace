@@ -24,3 +24,9 @@ Thumbs.db
 *.log
 *.exe
 *.docx
+
+# Harici projeye ait fraud modülü şartnamesi ve içerik dökümleri.
+# Repo public olduğu için bu dosyalar versiyonlanmaz; yerelde kalır.
+FRAUD MOD*.xlsx
+excel_full_analysis.txt
+excel_summary.json
