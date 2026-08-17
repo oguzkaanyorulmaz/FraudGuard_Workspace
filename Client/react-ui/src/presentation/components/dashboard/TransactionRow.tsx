@@ -1,6 +1,8 @@
 import React from 'react';
 import type { Transaction } from '../../../domain/entities/Transaction';
+import { RiskScore } from '../../../domain/value-objects/RiskScore';
 import { useAuth } from '../../contexts/AuthContext';
+import { theme } from '../../styles/theme';
 
 interface Props {
     transaction: Transaction;
@@ -39,8 +41,9 @@ export const TransactionRow: React.FC<Props> = React.memo(({
 }) => {
     const { user } = useAuth();
     const isAnalyst = user?.role === 3;
-    const scoreValue = transaction.riskScore ?? 0;
-    const isHighRisk = scoreValue >= 70;
+    const risk = new RiskScore(transaction.riskScore ?? 0);
+    const scoreValue = risk.getValue();
+    const riskStyle = theme.riskTier[risk.getTier()];
 
     const animationClass = 'row-enter';
 
@@ -61,9 +64,9 @@ export const TransactionRow: React.FC<Props> = React.memo(({
             </td>
             <td className="p-4">
                 <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold w-6 ${isHighRisk ? 'text-red-500' : 'text-orange-400'}`}>{scoreValue}</span>
+                    <span className={`text-xs font-bold w-6 ${riskStyle.text}`} title={risk.getLabel()}>{scoreValue}</span>
                     <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${isHighRisk ? 'bg-red-500' : 'bg-orange-500'}`} style={{ width: `${scoreValue}%` }}></div>
+                        <div className={`h-full rounded-full ${riskStyle.bar}`} style={{ width: `${risk.getBarPercent()}%` }}></div>
                     </div>
                 </div>
             </td>
@@ -75,9 +78,13 @@ export const TransactionRow: React.FC<Props> = React.memo(({
             </td>
             <td className="p-4 whitespace-normal break-words max-w-md">
                 <div className="flex flex-col">
-                    <span className={`text-[11px] px-2 py-0.5 rounded font-bold w-max border mb-1 ${isHighRisk ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-800 border-amber-100'}`}>
-                        {transaction.ruleName || 'SİSTEM UYARISI'}
-                    </span>
+                    <div className="flex flex-wrap gap-1 mb-1">
+                        {transaction.triggeredRules.map((r, idx) => (
+                            <span key={idx} className={`text-[11px] px-2 py-0.5 rounded font-bold border ${riskStyle.badge}`} title={r.code}>
+                                {r.name} {r.score !== undefined && <span className="opacity-80 text-[10px]">({r.score}P)</span>}
+                            </span>
+                        ))}
+                    </div>
                     <span className="text-slate-800 text-xs">↳ {transaction.suspicionReason || 'Sistem tarafından riskli bulunarak incelemeye alındı.'}</span>
                 </div>
             </td>

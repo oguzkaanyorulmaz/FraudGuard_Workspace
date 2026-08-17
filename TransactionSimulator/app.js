@@ -543,7 +543,7 @@ function renderHistory() {
         // Response fields
         if (r.transactionId) detailRows += historyDetailRow('İşlem ID', r.transactionId);
         if (r.rrn) detailRows += historyDetailRow('RRN', r.rrn);
-        if (r.declineReason) detailRows += historyDetailRow('Red Sebebi', r.declineReason);
+        if (r.declineReason && item.status !== 'Approved') detailRows += historyDetailRow('Red Sebebi', r.declineReason);
         if (r.fraudReason) detailRows += historyDetailRow('Fraud Nedeni', r.fraudReason);
         if (r.message) detailRows += historyDetailRow('Mesaj', r.message, true); // 🟢 fullWidth = true
 

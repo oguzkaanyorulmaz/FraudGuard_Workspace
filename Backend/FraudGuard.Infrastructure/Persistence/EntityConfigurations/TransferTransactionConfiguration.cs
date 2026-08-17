@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -21,6 +22,10 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             builder.Property(t => t.Status).IsRequired().HasMaxLength(20);
             builder.Property(t => t.DeclineReason).HasMaxLength(250);
             builder.Property(t => t.FraudReason).HasMaxLength(250);
+
+            // Motorun kararı işlemle birlikte saklanır; panel yeniden hesaplamaz.
+            builder.Property(t => t.RiskScore).HasDefaultValue(0);
+            builder.Property(t => t.RiskDecision).HasConversion<int>().HasDefaultValue(RiskDecisionEnum.Normal);
 
             builder.HasOne(t => t.ChannelType)
                    .WithMany(ct => ct.TransferTransactions)

@@ -1,4 +1,6 @@
+using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Domain.Common.Enums;
+using FraudGuard.Domain.DomainObjects.FraudEvaluation;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Abstractions;
@@ -40,9 +42,62 @@ namespace FraudGuard.Domain.Services
             _cacheProvider = cacheProvider;
         }
 
+        /// <summary>EBlockReason tablosundaki "Fraud" (Dolandırıcılık Şüphesi) kaydının kimliği.</summary>
+        private const int FraudBlockReasonId = 2;
+
         private string GenerateRrn()
         {
             return DateTime.UtcNow.ToString("yyMMdd") + new Random().Next(100000, 999999).ToString("D6");
+        }
+
+        /// <summary>
+        /// Fraud motorunun kademeli kararını işlem sonucuna yansıtır.
+        /// RET_BLOKE reddedilir; İZLE ve EK_DOGRULAMA şüpheli olarak kaydedilip analiste düşer.
+        /// </summary>
+        private static void ApplyFraudDecision(TransactionCheckResult result, FraudDecisionResult evaluation)
+        {
+            result.FraudDecision = evaluation;
+            result.IsSuspicious = evaluation.IsSuspicious;
+            result.TriggeredRuleName = evaluation.PrimaryRule?.RuleName ?? string.Empty;
+
+            if (!evaluation.IsSuspicious)
+                return;
+
+            // NORMAL kademesi "işleme izin ver" demektir. Kural tetiklenmiş olsa bile
+            // skor eşiğin altındaysa işlem şüpheli işaretlenmez; yalnızca gerekçe kaydedilir.
+            if (evaluation.Decision == RiskDecisionEnum.Normal)
+                return;
+
+            if (evaluation.ShouldBlock)
+            {
+                result.Status = "Declined";
+                result.DeclineReason = $"Fraud RET — Risk skoru {evaluation.FinalRiskScore}";
+                return;
+            }
+
+            result.Status = "Suspicious";
+            result.DeclineReason = evaluation.Decision == RiskDecisionEnum.EkDogrulama
+                ? $"Ek doğrulama gerekli (3D/OTP) — Risk skoru {evaluation.FinalRiskScore}"
+                : $"Fraud Şüphesi — Risk skoru {evaluation.FinalRiskScore}";
+        }
+
+        /// <summary>
+        /// RET_BLOKE kararında kartı fraud gerekçesiyle bloke eder.
+        /// </summary>
+        private async Task BlockCardForFraudAsync(ECreditCard? creditCard, EDebitCard? debitCard)
+        {
+            if (creditCard != null)
+            {
+                creditCard.IsBlocked = true;
+                creditCard.BlockReasonId = FraudBlockReasonId;
+                await _creditCardRepository.UpdateAsync(creditCard);
+            }
+            else if (debitCard != null)
+            {
+                debitCard.IsBlocked = true;
+                debitCard.BlockReasonId = FraudBlockReasonId;
+                await _debitCardRepository.UpdateAsync(debitCard);
+            }
         }
 
         public async Task<TransactionCheckResult> ProcessTransactionAsync(ProcessTransactionInput input)
@@ -66,13 +121,11 @@ namespace FraudGuard.Domain.Services
                     return result;
                 }
 
-                bool hasSuspicious = await _transactionRepository.HasAnySuspiciousTransactionAsync(senderDebit.CardId, isCreditCard: false);
-                if (hasSuspicious)
-                {
-                    result.Status = "Declined";
-                    result.DeclineReason = "Hesabınızda bekleyen şüpheli işlem bulunmaktadır. Yeni işlem yapılamaz.";
-                    return result;
-                }
+                // Not: "bekleyen şüpheli işlem varsa tümünü reddet" kontrolü kaldırıldı.
+                // Kademeli karar modelinde İZLE "işleme izin ver, analiste bayrak düş" demektir;
+                // eski kontrol İZLE'yi fiilen kalıcı bloke haline getiriyordu.
+                // Gerçek bloke RET_BLOKE kararında uygulanır (kart/hesap IsBlocked işaretlenir)
+                // ve yukarıdaki IsBlocked kontrolü tarafından yakalanır.
 
                 decimal processedAmount = await _currencyService.ConvertToTryAsync(input.Amount, input.Currency);
 
@@ -104,14 +157,18 @@ namespace FraudGuard.Domain.Services
                     }
                 }
 
-                var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, senderDebit.CardId);
-                bool isSuspicious = !string.IsNullOrEmpty(evaluationResult.RuleCode);
+                var evaluationResult = await _fraudEvaluationService.EvaluateAsync(
+                    input, senderDebit.CardId, isCreditCard: false);
+                ApplyFraudDecision(result, evaluationResult);
+                bool isSuspicious = evaluationResult.IsSuspicious;
 
-                if (isSuspicious)
+                if (evaluationResult.ShouldBlock)
                 {
-                    result.Status = "Suspicious";
-                    result.DeclineReason = $"Fraud Şüphesi: {evaluationResult.RuleCode}";
-
+                    // RET kararı: tutar aktarılmaz, gönderen hesap fraud gerekçesiyle bloke edilir.
+                    await BlockCardForFraudAsync(null, senderDebit);
+                }
+                else if (isSuspicious)
+                {
                     senderDebit.Balance -= processedAmount;
                     await _debitCardRepository.UpdateAsync(senderDebit);
                 }
@@ -155,7 +212,9 @@ namespace FraudGuard.Domain.Services
                     Country = input.Country ?? "Türkiye",
                     Status = result.Status,
                     DeclineReason = result.DeclineReason,
-                    FraudReason = evaluationResult.FraudReason
+                    FraudReason = evaluationResult.BuildReasonSummary(),
+                    RiskScore = evaluationResult.FinalRiskScore,
+                    RiskDecision = evaluationResult.Decision
                 };
 
                 await _transactionRepository.AddTransferTransactionAsync(transferTx);
@@ -169,9 +228,19 @@ namespace FraudGuard.Domain.Services
                     await _cacheProvider.RemoveAsync($"recent_txs_{receiverDebit.CardNumber}");
                 }
 
-                if (isSuspicious && evaluationResult.RuleCode != null)
+                // Alarm yalnızca karar NORMAL'in üzerindeyse açılır; onaylanan işlem
+                // analist kuyruğuna girmez. Status, ApplyFraudDecision tarafından kademeye
+                // göre set edilmiştir.
+                if (evaluationResult.PrimaryRule != null && result.Status != "Approved")
                 {
-                    await _fraudEvaluationService.CreateFraudLogAsync(transferTx.TransactionId, evaluationResult.RuleCode, input.PaymentType);
+                    bool isAutoBlocked = evaluationResult.ShouldBlock || result.Status == "Declined";
+                    await _fraudEvaluationService.CreateFraudLogAsync(
+                        transferTx.TransactionId,
+                        evaluationResult.PrimaryRule.RuleCode,
+                        input.PaymentType,
+                        isAutoBlocked: isAutoBlocked,
+                        resolvedBy: isAutoBlocked ? "Sistem (Otomatik Bloke)" : null,
+                        adminNote: isAutoBlocked ? "Sistem tarafından şüpheli bulunup direkt bloke edildi." : null);
                     await _unitOfWork.SaveChangesAsync();
                 }
 
@@ -226,13 +295,8 @@ namespace FraudGuard.Domain.Services
                 bool isBlocked = isCredit ? creditCard.IsBlocked : debitCard.IsBlocked;
                 string cardCvv = isCredit ? creditCard.CVV : debitCard.CVV;
 
-                bool hasSuspicious = await _transactionRepository.HasAnySuspiciousTransactionAsync(cardId, isCreditCard: isCredit);
-                if (hasSuspicious)
-                {
-                    result.Status = "Declined";
-                    result.DeclineReason = "Kart şüpheli durumda, müşteri hizmetlerini arayınız.";
-                    return result;
-                }
+                // Not: "geçmişte şüpheli işlem varsa tümünü reddet" kontrolü kaldırıldı.
+                // Bkz. transfer dalındaki açıklama — bloke yalnızca RET_BLOKE kararında uygulanır.
 
                 bool isCvvIncorrect = (cardCvv != input.CVV);
                 bool isCvvSuspicious = false;
@@ -273,6 +337,12 @@ namespace FraudGuard.Domain.Services
                 bool isSuspicious = isCvvSuspicious;
                 string? triggeredRuleCode = isCvvSuspicious ? "BRUTE_FORCE" : null;
                 string? capturedFraudReason = isCvvSuspicious ? "3 kez üst üste hatalı CVV denemesi yapılmıştır." : null;
+
+                // CVV brute-force kontrolü kural motorundan önce, ondan bağımsız çalışır;
+                // dolayısıyla motorun ürettiği bir skoru yoktur. Mevcut davranışı (analiste
+                // düşen şüpheli işlem) korumak için İZLE eşiğine sabitlenir.
+                int capturedRiskScore = isCvvSuspicious ? RiskScoringConstants.IzleThreshold : 0;
+                RiskDecisionEnum capturedDecision = isCvvSuspicious ? RiskDecisionEnum.Izle : RiskDecisionEnum.Normal;
 
                 if (input.TransactionType == TransactionTypeEnum.Refund) 
                 {
@@ -321,15 +391,19 @@ namespace FraudGuard.Domain.Services
 
                     if (!isCvvSuspicious)
                     {
-                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
-                        triggeredRuleCode = evaluationResult.RuleCode;
-                        capturedFraudReason = evaluationResult.FraudReason;
-                        
-                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
-                        result.Status = isSuspicious ? "Suspicious" : "Approved";
-                        if (isSuspicious)
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId, isCredit);
+                        triggeredRuleCode = evaluationResult.PrimaryRule?.RuleCode;
+                        capturedFraudReason = evaluationResult.BuildReasonSummary();
+                        isSuspicious = evaluationResult.IsSuspicious;
+                        capturedRiskScore = evaluationResult.FinalRiskScore;
+                        capturedDecision = evaluationResult.Decision;
+
+                        result.Status = "Approved";
+                        ApplyFraudDecision(result, evaluationResult);
+
+                        if (evaluationResult.ShouldBlock)
                         {
-                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                            await BlockCardForFraudAsync(isCredit ? creditCard : null, isCredit ? null : debitCard);
                         }
                     }
                 }
@@ -347,36 +421,29 @@ namespace FraudGuard.Domain.Services
 
                     if (!isBlocked && !isCvvSuspicious && !isInitialDecline)
                     {
-                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
-                        
-                        triggeredRuleCode = evaluationResult.RuleCode;
-                        capturedFraudReason = evaluationResult.FraudReason;
-                        
-                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
-                        if (isInitialDecline)
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId, isCredit);
+
+                        triggeredRuleCode = evaluationResult.PrimaryRule?.RuleCode;
+                        capturedFraudReason = evaluationResult.BuildReasonSummary();
+                        isSuspicious = evaluationResult.IsSuspicious;
+                        capturedRiskScore = evaluationResult.FinalRiskScore;
+                        capturedDecision = evaluationResult.Decision;
+
+                        result.Status = "Approved";
+                        ApplyFraudDecision(result, evaluationResult);
+
+                        if (evaluationResult.ShouldBlock)
                         {
-                            result.Status = "Declined";
+                            // RET kararında tutar tahsil edilmez ve kart bloke edilir.
+                            await BlockCardForFraudAsync(isCredit ? creditCard : null, isCredit ? null : debitCard);
+                        }
+                        else if (isCredit)
+                        {
+                            creditCard.AvailableLimit -= processedAmount;
                         }
                         else
                         {
-                            if (isSuspicious)
-                            {
-                                result.Status = "Suspicious";
-                                result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
-                            }
-                            else
-                            {
-                                result.Status = "Approved";
-                            }
-
-                            if (isCredit)
-                            {
-                                creditCard.AvailableLimit -= processedAmount;
-                            }
-                            else
-                            {
-                                debitCard.Balance -= processedAmount;
-                            }
+                            debitCard.Balance -= processedAmount;
                         }
                     }
                 }
@@ -401,15 +468,18 @@ namespace FraudGuard.Domain.Services
                     // 💥 FRAUD DEĞERLENDİRMESİ
                     if (!isBlocked && !isCvvSuspicious)
                     {
-                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
-                        triggeredRuleCode = evaluationResult.RuleCode;
-                        capturedFraudReason = evaluationResult.FraudReason;
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId, isCredit);
+                        triggeredRuleCode = evaluationResult.PrimaryRule?.RuleCode;
+                        capturedFraudReason = evaluationResult.BuildReasonSummary();
+                        isSuspicious = evaluationResult.IsSuspicious;
+                        capturedRiskScore = evaluationResult.FinalRiskScore;
+                        capturedDecision = evaluationResult.Decision;
 
-                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
-                        if (isSuspicious)
+                        ApplyFraudDecision(result, evaluationResult);
+
+                        if (evaluationResult.ShouldBlock)
                         {
-                            result.Status = "Suspicious";
-                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                            await BlockCardForFraudAsync(isCredit ? creditCard : null, isCredit ? null : debitCard);
                         }
                     }
                 }
@@ -447,15 +517,18 @@ namespace FraudGuard.Domain.Services
                     // 💥 FRAUD DEĞERLENDİRMESİ
                     if (!isBlocked && !isCvvSuspicious)
                     {
-                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId);
-                        triggeredRuleCode = evaluationResult.RuleCode;
-                        capturedFraudReason = evaluationResult.FraudReason;
+                        var evaluationResult = await _fraudEvaluationService.EvaluateAsync(input, cardId, isCredit);
+                        triggeredRuleCode = evaluationResult.PrimaryRule?.RuleCode;
+                        capturedFraudReason = evaluationResult.BuildReasonSummary();
+                        isSuspicious = evaluationResult.IsSuspicious;
+                        capturedRiskScore = evaluationResult.FinalRiskScore;
+                        capturedDecision = evaluationResult.Decision;
 
-                        isSuspicious = !string.IsNullOrEmpty(triggeredRuleCode);
-                        if (isSuspicious)
+                        ApplyFraudDecision(result, evaluationResult);
+
+                        if (evaluationResult.ShouldBlock)
                         {
-                            result.Status = "Suspicious";
-                            result.DeclineReason = $"Fraud Şüphesi: {triggeredRuleCode}";
+                            await BlockCardForFraudAsync(isCredit ? creditCard : null, isCredit ? null : debitCard);
                         }
                     }
                 }
@@ -484,6 +557,8 @@ namespace FraudGuard.Domain.Services
                         Status = result.Status,
                         DeclineReason = result.Status == "Suspicious" ? $"Fraud: {triggeredRuleCode}" : result.DeclineReason,
                         FraudReason = capturedFraudReason,
+                        RiskScore = capturedRiskScore,
+                        RiskDecision = capturedDecision,
                         RRN = assignedRrn
                     };
 
@@ -508,6 +583,8 @@ namespace FraudGuard.Domain.Services
                         Status = result.Status,
                         DeclineReason = result.Status == "Suspicious" ? $"Fraud: {triggeredRuleCode}" : result.DeclineReason,
                         FraudReason = capturedFraudReason,
+                        RiskScore = capturedRiskScore,
+                        RiskDecision = capturedDecision,
                         RRN = assignedRrn
                     };
 
@@ -520,10 +597,18 @@ namespace FraudGuard.Domain.Services
                 await _cacheProvider.RemoveAsync(cacheKey);
                 await _cacheProvider.RemoveAsync($"recent_txs_{input.CardNumber}");
 
-                if (isSuspicious && triggeredRuleCode != null)
+                // Bkz. transfer dalı: NORMAL kademesinde alarm açılmaz.
+                if (triggeredRuleCode != null && result.Status != "Approved")
                 {
-                    await _fraudEvaluationService.CreateFraudLogAsync(newTransactionId, triggeredRuleCode, input.PaymentType);
-                    await _unitOfWork.SaveChangesAsync(); 
+                    bool isAutoBlocked = (capturedDecision == RiskDecisionEnum.RetBloke || result.Status == "Declined");
+                    await _fraudEvaluationService.CreateFraudLogAsync(
+                        newTransactionId,
+                        triggeredRuleCode,
+                        input.PaymentType,
+                        isAutoBlocked: isAutoBlocked,
+                        resolvedBy: isAutoBlocked ? "Sistem (Otomatik Bloke)" : null,
+                        adminNote: isAutoBlocked ? "Sistem tarafından şüpheli bulunup direkt bloke edildi." : null);
+                    await _unitOfWork.SaveChangesAsync();
                 }
 
                 result.TransactionId = newTransactionId;

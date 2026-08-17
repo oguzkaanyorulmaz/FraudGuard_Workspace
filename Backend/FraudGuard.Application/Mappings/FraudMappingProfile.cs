@@ -25,7 +25,9 @@ namespace FraudGuard.Application.Mappings
                     src.Transaction == null ? "Unknown" : src.Transaction.PaymentType.ToString()));
 
 
-            CreateMap<EFraudRule, GetActiveRulesResponse>();
+            CreateMap<EFraudRule, GetActiveRulesResponse>()
+                .ForMember(d => d.Target, o => o.MapFrom(s => s.Target.ToString()))
+                .ForMember(d => d.Category, o => o.MapFrom(s => s.Category.ToString()));
         }
     }
 }

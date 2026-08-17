@@ -22,7 +22,13 @@ namespace FraudGuard.Domain.Entities
         public string Status { get; set; }
         public string? DeclineReason { get; set; }
         public string? FraudReason { get; set; }
-        
+
+        /// <summary>Fraud motorunun nihai skoru. Karar anında yazılır.</summary>
+        public int RiskScore { get; set; }
+
+        /// <summary>Skorun karşılık geldiği kademe.</summary>
+        public RiskDecisionEnum RiskDecision { get; set; } = RiskDecisionEnum.Normal;
+
         // Navigation Properties
         public virtual ECreditCard CreditCard { get; set; }
         public virtual ETransactionType TransactionType { get; set; }

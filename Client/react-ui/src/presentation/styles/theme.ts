@@ -29,5 +29,30 @@ export const theme = {
         outlineButton: "bg-white border border-[#FDBB30] text-[#111] rounded-lg px-5 py-2 font-semibold hover:bg-[#FDBB30]/10 transition-all text-sm",
         blackButton: "bg-[#111111] text-white rounded-lg px-5 py-2 font-semibold hover:bg-black transition-all text-sm",
         primaryButton: "bg-[#FDBB30] text-[#111] rounded-lg px-5 py-2 font-bold hover:bg-[#E5A520] transition-all text-sm"
+    },
+
+    // Risk kademelerinin görsel karşılığı. Kademeler RiskScore value object'inden gelir;
+    // eşik değerleri orada tanımlıdır (backend RiskScoringConstants ile hizalı).
+    riskTier: {
+        NORMAL: {
+            text: "text-emerald-600",
+            bar: "bg-emerald-500",
+            badge: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+        },
+        IZLE: {
+            text: "text-amber-500",
+            bar: "bg-amber-500",
+            badge: "bg-amber-500/10 text-amber-600 border-amber-500/20"
+        },
+        EK_DOGRULAMA: {
+            text: "text-orange-500",
+            bar: "bg-orange-500",
+            badge: "bg-orange-500/10 text-orange-600 border-orange-500/20"
+        },
+        RET_BLOKE: {
+            text: "text-red-600",
+            bar: "bg-red-600",
+            badge: "bg-red-500/10 text-red-600 border-red-500/20"
+        }
     }
 };

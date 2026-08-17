@@ -26,6 +26,17 @@ namespace FraudGuard.Domain.Interfaces.Entities
         string Status { get; set; }
         string? DeclineReason { get; set; }
         string? FraudReason { get; set; }
+
+        /// <summary>
+        /// Fraud motorunun bu işlem için ürettiği nihai kümülatif risk skoru.
+        /// Karar anında yazılır; sonradan yeniden hesaplanmaz.
+        /// Kural değerlendirmesine hiç girilmediyse 0 kalır.
+        /// </summary>
+        int RiskScore { get; set; }
+
+        /// <summary>Skorun karşılık geldiği kademeli karar. Skorla birlikte yazılır.</summary>
+        RiskDecisionEnum RiskDecision { get; set; }
+
         EFraudLog? FraudLog { get; }
     }
 }

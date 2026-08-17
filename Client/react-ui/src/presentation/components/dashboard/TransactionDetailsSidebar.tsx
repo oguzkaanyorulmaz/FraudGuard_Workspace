@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { Transaction } from '../../../domain/entities/Transaction';
+import { RiskScore } from '../../../domain/value-objects/RiskScore';
 import { useAuth } from '../../contexts/AuthContext';
+import { theme } from '../../styles/theme';
 
 interface Props {
     transaction: Transaction | null;
@@ -66,8 +68,9 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
 
     if (!shouldRender || !localTxn) return null;
 
-    const scoreValue = localTxn.riskScore ?? 0;
-    const isHighRisk = scoreValue >= 70;
+    const risk = new RiskScore(localTxn.riskScore ?? 0);
+    const scoreValue = risk.getValue();
+    const riskStyle = theme.riskTier[risk.getTier()];
 
     const formatCardNumber = (num: string) => {
         if (!num) return '';
@@ -196,8 +199,8 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                 ⚙️ {detail.transactionTypeName}
                             </div>
                         )}
-                        <div className={`mt-3 inline-block px-3.5 py-1.5 rounded-full text-sm font-bold border ${isHighRisk ? 'bg-red-500/10 text-red-600 border-red-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
-                            Risk Skoru: {scoreValue} / 100
+                        <div className={`mt-3 inline-block px-3.5 py-1.5 rounded-full text-sm font-bold border ${riskStyle.badge}`}>
+                            Risk Skoru: {scoreValue} — {risk.getLabel()}
                         </div>
                     </div>
 
@@ -530,8 +533,8 @@ export const TransactionDetailsSidebar: React.FC<Props> = ({ transaction, isOpen
                                                                                 }`}>{tx.status === 'Approved' ? 'Güvenli (Approved)' : tx.status === 'Suspicious' ? 'Şüpheli (Suspicious)' : 'Reddedildi (Declined)'}</span>
                                                                         </div>
 
-                                                                        {/* Red Sebebi (Varsa) */}
-                                                                        {tx.declineReason && (
+                                                                        {/* Red Sebebi (Yalnızca reddedilen/blokelenen işlemlerde) */}
+                                                                        {tx.declineReason && tx.status !== 'Approved' && (
                                                                             <div className="bg-white p-3 rounded-xl border border-[#E4E7EB] shadow-sm col-span-2">
                                                                                 <span className="text-xs text-[#718096] font-bold uppercase tracking-wider block mb-1">Red Sebebi</span>
                                                                                 <span className="font-bold text-red-600 text-sm">{tx.declineReason}</span>

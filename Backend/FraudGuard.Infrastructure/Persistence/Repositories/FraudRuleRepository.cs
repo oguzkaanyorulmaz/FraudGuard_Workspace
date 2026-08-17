@@ -24,7 +24,30 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
 
         public async Task<List<EFraudRule>> GetAllActiveRulesAsync()
         {
-            return await _context.FraudRules.Where(r => r.IsActive).ToListAsync();
+            // Motor her işlemde bu listeyi okur; önbelleğe alınmaz ki veritabanına eklenen
+            // kural bir sonraki işlemde devreye girsin. Takip edilmesine gerek yok.
+            return await _context.FraudRules
+                .AsNoTracking()
+                .Where(r => r.IsActive)
+                .ToListAsync();
+        }
+
+        public async Task<List<EFraudRule>> GetAllAsync()
+        {
+            return await _context.FraudRules
+                .AsNoTracking()
+                .OrderBy(r => r.RuleId)
+                .ToListAsync();
+        }
+
+        public async Task<bool> ExistsByCodeAsync(string ruleCode)
+        {
+            return await _context.FraudRules.AnyAsync(r => r.RuleCode == ruleCode);
+        }
+
+        public async Task AddAsync(EFraudRule rule)
+        {
+            await _context.FraudRules.AddAsync(rule);
         }
     }
 }

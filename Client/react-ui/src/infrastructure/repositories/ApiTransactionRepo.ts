@@ -39,24 +39,33 @@ export class ApiTransactionRepo implements ITransactionRepository {
             return [];
         }
 
-        return dataList.map((item: any) => new Transaction({
-            id: item.logId ? item.logId.toString() : (item.id ? item.id.toString() : "0"),
-            transactionId: item.transactionId ? item.transactionId.toString() : "0",
-            maskedCard: item.cardNumber || item.maskedCardNumber || "Bilinmiyor",
-            money: new Money(item.amount || 0, item.currency || "TRY"),
+        return dataList.map((item: any) => {
+            const rawReason = item.reason || item.suspicionReason || "Belirtilmemiş";
+            let realScore = item.riskScore || 0;
+            if (rawReason) {
+                const match = rawReason.match(/Skor\s+(\d+)/i);
+                if (match && match[1]) {
+                    realScore = parseInt(match[1], 10);
+                }
+            }
 
-            riskScore: item.riskScore || 0,
-
-            suspicionReason: item.reason || item.suspicionReason || "Belirtilmemiş",
-            ruleName: item.ruleName || "Bilinmeyen Kural",
-            location: item.location || "Bilinmiyor",
-            date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
-            fraudReason: item.fraudReason || undefined,
-            ruleCode: item.ruleCode || undefined,
-            paymentType: item.paymentTypeCode === 'CreditCard' ? 'CREDIT_CARD' :
-                         item.paymentTypeCode === 'DebitCard' ? 'DEBIT_CARD' :
-                         (item.paymentTypeCode === 'BankTransfer' || item.paymentTypeCode === 'EFT') ? 'BANK_TRANSFER' : undefined
-        }));
+            return new Transaction({
+                id: item.logId ? item.logId.toString() : (item.id ? item.id.toString() : "0"),
+                transactionId: item.transactionId ? item.transactionId.toString() : "0",
+                maskedCard: item.cardNumber || item.maskedCardNumber || "Bilinmiyor",
+                money: new Money(item.amount || 0, item.currency || "TRY"),
+                riskScore: realScore,
+                suspicionReason: rawReason,
+                ruleName: item.ruleName || "Bilinmeyen Kural",
+                location: item.location || "Bilinmiyor",
+                date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),
+                fraudReason: item.fraudReason || undefined,
+                ruleCode: item.ruleCode || undefined,
+                paymentType: item.paymentTypeCode === 'CreditCard' ? 'CREDIT_CARD' :
+                             item.paymentTypeCode === 'DebitCard' ? 'DEBIT_CARD' :
+                             (item.paymentTypeCode === 'BankTransfer' || item.paymentTypeCode === 'EFT') ? 'BANK_TRANSFER' : undefined
+            });
+        });
     }
 
     async approveTransaction(id: string, reason: string, analystName?: string): Promise<boolean> {
@@ -142,6 +151,14 @@ export class ApiTransactionRepo implements ITransactionRepository {
 
         return dataList.map((item: any) => {
             const historyAction = item.adminAction === 'MarkAsSafe' ? 'APPROVED' : 'BLOCKED';
+            const rawReason = item.reason || item.suspicionReason || "Belirtilmemiş";
+            let realScore = item.riskScore || 0;
+            if (rawReason) {
+                const match = rawReason.match(/Skor\s+(\d+)/i);
+                if (match && match[1]) {
+                    realScore = parseInt(match[1], 10);
+                }
+            }
 
             return {
                 transaction: new Transaction({
@@ -149,8 +166,8 @@ export class ApiTransactionRepo implements ITransactionRepository {
                     transactionId: item.transactionId ? item.transactionId.toString() : "0",
                     maskedCard: item.cardNumber || item.maskedCardNumber || "Bilinmiyor",
                     money: new Money(item.amount || 0, item.currency || "TRY"),
-                    riskScore: item.riskScore || 0,
-                    suspicionReason: item.reason || item.suspicionReason || "Belirtilmemiş",
+                    riskScore: realScore,
+                    suspicionReason: rawReason,
                     ruleName: item.ruleName || "Bilinmeyen Kural",
                     location: item.location || "Bilinmiyor",
                     date: item.transactionDate || item.logDate || item.date || item.createdAt || new Date().toISOString(),

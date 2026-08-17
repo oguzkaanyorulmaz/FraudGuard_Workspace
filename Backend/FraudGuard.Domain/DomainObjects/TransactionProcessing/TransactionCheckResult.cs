@@ -1,3 +1,5 @@
+using FraudGuard.Domain.DomainObjects.FraudEvaluation;
+
 namespace FraudGuard.Domain.DomainObjects.TransactionProcessing
 {
     public class TransactionCheckResult
@@ -10,5 +12,11 @@ namespace FraudGuard.Domain.DomainObjects.TransactionProcessing
         public int? TriggeredRuleId { get; set; }
         public string TriggeredRuleName { get; set; } = string.Empty;
         public string RRN { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Fraud motorunun tam kararı: kademeli sonuç, skor kırılımı, tetiklenen kurallar.
+        /// Kural değerlendirmesine hiç girilmediyse (ör. geçersiz kart) null kalır.
+        /// </summary>
+        public FraudDecisionResult? FraudDecision { get; set; }
     }
 }

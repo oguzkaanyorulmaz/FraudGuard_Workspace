@@ -7,6 +7,9 @@ using FraudGuard.Domain.Interfaces.Repositories;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Domain.Services;
+using FraudGuard.Domain.Services.RuleEngine;
+using FraudGuard.Infrastructure.RuleEngine;
+using FraudGuard.Infrastructure.Diagnostics;
 using FraudGuard.Application.Interfaces;
 using FraudGuard.Application.Services;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +19,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using System;
 using FraudGuard.API.Hubs;
-using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Infrastructure.Services;
-using FraudGuard.Infrastructure.Persistence.Repositories;
-using FraudGuard.Application.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,8 +39,22 @@ builder.Services.AddScoped<IFraudRuleRepository, FraudRuleRepository>();
 builder.Services.AddScoped<IFraudLogRepository, FraudLogRepository>();
 builder.Services.AddScoped<IBankAccountBeneficiaryRepository, BankAccountBeneficiaryRepository>();
 builder.Services.AddScoped<IUnitOfWork, FraudGuard.Infrastructure.Persistence.UnitOfWork>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<IRuleCombinationRepository, RuleCombinationRepository>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IFraudEvaluationService, FraudEvaluationService>();
+
+// --- Dinamik kural motoru ---
+// Derleyici singleton: derlenen delegate önbelleği süreç ömrü boyunca paylaşılır.
+builder.Services.AddSingleton<IRuleExpressionCompiler, DynamicExpressoRuleCompiler>();
+// Bozuk kurallar sessizce atlanmaz; teşhis kanalı üzerinden loglanır.
+builder.Services.AddSingleton<IRuleDiagnostics, RuleDiagnostics>();
+// Kombinasyon ve güven servisleri durumsuzdur.
+builder.Services.AddSingleton<ICombinationEngine, CombinationEngine>();
+builder.Services.AddSingleton<ITrustScoreService, TrustScoreService>();
+// Motor, scoped olan kod tabanlı IFraudRule örneklerini aldığı için scoped'dır.
+builder.Services.AddScoped<IDynamicRuleEngine, DynamicRuleEngine>();
+
 builder.Services.AddFraudRules();
 builder.Services.AddScoped<IAdminOperationService, AdminOperationService>();
 builder.Services.AddMemoryCache();
@@ -101,6 +115,60 @@ using (var scope = app.Services.CreateScope())
                 {
                     creator.CreateTables();
                 }
+            }
+
+            // Schema migration check for new dynamic rule columns and tables
+            try
+            {
+                context.Database.ExecuteSqlRaw(@"
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CreditCardTransactions') AND name = 'RiskScore')
+    ALTER TABLE CreditCardTransactions ADD RiskScore INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CreditCardTransactions') AND name = 'RiskDecision')
+    ALTER TABLE CreditCardTransactions ADD RiskDecision INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('DebitCardTransactions') AND name = 'RiskScore')
+    ALTER TABLE DebitCardTransactions ADD RiskScore INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('DebitCardTransactions') AND name = 'RiskDecision')
+    ALTER TABLE DebitCardTransactions ADD RiskDecision INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TransferTransactions') AND name = 'RiskScore')
+    ALTER TABLE TransferTransactions ADD RiskScore INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TransferTransactions') AND name = 'RiskDecision')
+    ALTER TABLE TransferTransactions ADD RiskDecision INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'Expression')
+    ALTER TABLE FraudRules ADD Expression NVARCHAR(MAX) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'Score')
+    ALTER TABLE FraudRules ADD Score INT NOT NULL DEFAULT 20;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'Target')
+    ALTER TABLE FraudRules ADD Target INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'Category')
+    ALTER TABLE FraudRules ADD Category INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RuleCombinations')
+BEGIN
+    CREATE TABLE RuleCombinations (
+        CombinationId INT IDENTITY(1,1) PRIMARY KEY,
+        CombinationName NVARCHAR(150) NOT NULL,
+        Description NVARCHAR(500) NOT NULL,
+        RuleCodes NVARCHAR(200) NOT NULL,
+        BonusScore INT NOT NULL,
+        Target INT NOT NULL,
+        Category INT NOT NULL,
+        IsActive BIT NOT NULL DEFAULT 1
+    );
+END
+");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Şema senkronizasyonu uyarısı: {ex.Message}");
             }
 
             Console.WriteLine("Veritabanı ve tablolar başarıyla oluşturuldu!");

@@ -35,6 +35,24 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
             await _context.FraudLogs.AddAsync(log);
         }
 
+        public async Task<int> CountRecentAlarmsForCardAsync(int cardId, bool isCreditCard, System.DateTime since)
+        {
+            if (isCreditCard)
+            {
+                return await _context.FraudLogs
+                    .Where(f => f.LogDate >= since
+                                && f.CreditCardTransactionId != null
+                                && f.CreditCardTransaction!.CreditCardId == cardId)
+                    .CountAsync();
+            }
+
+            return await _context.FraudLogs
+                .Where(f => f.LogDate >= since
+                            && f.DebitCardTransactionId != null
+                            && f.DebitCardTransaction!.DebitCardId == cardId)
+                .CountAsync();
+        }
+
         public async Task<EFraudLog> GetByIdAsync(int logId)
         {
             return await _context.FraudLogs
@@ -42,6 +60,16 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .Include(f => f.DebitCardTransaction)
                 .Include(f => f.TransferTransaction)
                 .FirstOrDefaultAsync(l => l.LogId == logId);
+        }
+
+        public async Task DeleteAsync(int logId)
+        {
+            var log = await _context.FraudLogs.FindAsync(logId);
+            if (log != null)
+            {
+                _context.FraudLogs.Remove(log);
+                await _context.SaveChangesAsync();
+            }
         }
 
         public async Task UpdateAsync(EFraudLog fraudLog)

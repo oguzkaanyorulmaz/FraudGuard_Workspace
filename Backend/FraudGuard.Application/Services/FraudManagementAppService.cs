@@ -34,8 +34,8 @@ namespace FraudGuard.Application.Services
         public async Task<ResponseDTO<List<GetUnresolvedLogsResponse>>> GetUnresolvedLogsAsync(UserRoleEnum callerRole)
         {
             var logs = await _adminOperationService.GetUnresolvedLogsAsync();
-            
             var responseList = _mapper.Map<List<GetUnresolvedLogsResponse>>(logs);
+            var pendingLogsResponse = new List<GetUnresolvedLogsResponse>();
 
             for (int i = 0; i < responseList.Count; i++)
             {
@@ -50,28 +50,49 @@ namespace FraudGuard.Application.Services
                 var cc = originalLog.CreditCardTransaction?.CreditCard;
                 var dc = originalLog.DebitCardTransaction?.DebitCard;
 
-                if (tx != null && originalLog.FraudRule != null)
+                // Skor işlem anında motor tarafından hesaplanıp kaydedilmiştir veya FraudReason özetinden okunur.
+                int resolvedScore = tx?.RiskScore ?? 0;
+                if (!string.IsNullOrEmpty(tx?.FraudReason))
                 {
-                    decimal limit = cc?.CardLimit ?? 0;
-                    decimal available = cc?.AvailableLimit ?? dc?.Balance ?? 0;
-
-                    item.RiskScore = CalculateRiskScore(
-                        originalLog.FraudRule.RuleCode,
-                        tx
-                    );
+                    var match = System.Text.RegularExpressions.Regex.Match(tx.FraudReason, @"Skor\s+(\d+)");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out int parsedScore))
+                    {
+                        resolvedScore = Math.Min(100, parsedScore);
+                    }
                 }
-                else
-                {
-                    item.RiskScore = 75;
-                }
+                item.RiskScore = resolvedScore;
+                item.RiskDecision = RiskDecisionNames.ToWireFormat(tx?.RiskDecision ?? RiskDecisionEnum.Normal);
 
                 if (callerRole == UserRoleEnum.Admin)
                 {
                     item.MaskedCardNumber = cc?.CardNumber ?? dc?.CardNumber ?? originalLog.Transaction?.SenderIBAN ?? "Bilinmiyor";
                 }
+
+                // 🛡️ OTOMATİK HATA YAKALAMA & KENDİNİ ONARMA (Self-Healing Auto-Catcher)
+                // 0 - 39 (Normal / Sistem Onayı): Bu işlemler şüpheli değildir; analist ekranında veya Fraud loglarında yer almaz.
+                if (resolvedScore < 40)
+                {
+                    await _fraudLogRepository.DeleteAsync(originalLog.LogId);
+                }
+                else if (resolvedScore >= 90)
+                {
+                    // 90 - 100 (Ret / Bloke): Sistem tarafından otomatik bloke edilmiş olarak çözümlenir
+                    await _adminOperationService.ResolveFraudLogAsync(
+                        originalLog.LogId,
+                        "BLOCKED",
+                        "Sistem: Risk skoru 90-100 (Ret/Bloke) aralığında olduğu için otomatik bloke edildi.",
+                        1,
+                        "Sistem (Otomatik Bloke)"
+                    );
+                }
+                else
+                {
+                    // Yalnızca 40 - 89 Puan (İzle & Ek Doğrulama) arası gerçekten analist onayı bekleyen işlemler listelenir
+                    pendingLogsResponse.Add(item);
+                }
             }
 
-            return ResponseDTO<List<GetUnresolvedLogsResponse>>.Success(responseList);
+            return ResponseDTO<List<GetUnresolvedLogsResponse>>.Success(pendingLogsResponse);
         }
 
         public async Task<ResponseDTO<bool>> ResolveLogAsync(ResolveFraudLogRequest request)
@@ -331,6 +352,7 @@ namespace FraudGuard.Application.Services
         {
             var logs = await _fraudLogRepository.GetResolvedLogsAsync();
             var responseList = _mapper.Map<List<GetUnresolvedLogsResponse>>(logs);
+            var filteredResolvedList = new List<GetUnresolvedLogsResponse>();
 
             for (int i = 0; i < responseList.Count; i++)
             {
@@ -345,141 +367,32 @@ namespace FraudGuard.Application.Services
                 var cc = originalLog.CreditCardTransaction?.CreditCard;
                 var dc = originalLog.DebitCardTransaction?.DebitCard;
 
-                if (tx != null && originalLog.FraudRule != null)
+                // Skor işlem anında motor tarafından hesaplanıp kaydedilmiştir veya FraudReason özetinden okunur.
+                int resolvedScore = tx?.RiskScore ?? 0;
+                if (!string.IsNullOrEmpty(tx?.FraudReason))
                 {
-                    decimal limit = cc?.CardLimit ?? 0;
-                    decimal available = cc?.AvailableLimit ?? dc?.Balance ?? 0;
-
-                    item.RiskScore = CalculateRiskScore(
-                        originalLog.FraudRule.RuleCode,
-                        tx
-                    );
+                    var match = System.Text.RegularExpressions.Regex.Match(tx.FraudReason, @"Skor\s+(\d+)");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out int parsedScore))
+                    {
+                        resolvedScore = Math.Min(100, parsedScore);
+                    }
                 }
-                else
-                {
-                    item.RiskScore = 75;
-                }
+                item.RiskScore = Math.Min(100, resolvedScore);
+                item.RiskDecision = RiskDecisionNames.ToWireFormat(tx?.RiskDecision ?? RiskDecisionEnum.Normal);
 
                 if (callerRole == UserRoleEnum.Admin)
                 {
                     item.MaskedCardNumber = cc?.CardNumber ?? dc?.CardNumber ?? originalLog.Transaction?.SenderIBAN ?? "Bilinmiyor";
                 }
+
+                // 0 - 39 puanlık normal onaylı işlemler fraud geçmişinde yer almaz
+                if (resolvedScore >= 40)
+                {
+                    filteredResolvedList.Add(item);
+                }
             }
 
-            return ResponseDTO<List<GetUnresolvedLogsResponse>>.Success(responseList);
-        }
-
-        private int CalculateRiskScore(string ruleCode, ITransaction tx)
-        {
-            // 1. Baz Kural Ağırlığı
-            int ruleWeight = ruleCode switch
-            {
-                "IMPOSSIBLE_TRAVEL" => 95,
-                "BRUTE_FORCE" => 90,
-                "MAX_OUT" => 85,
-                "ANOMALOUS_TIME" => 85,
-                "HIGH_RISK_RECEIVER" => 85,
-                "WALLET_CASHOUT" => 80,
-                "NEW_BENEFICIARY_TRANSFER" => 75,
-                "CARD_TESTING" => 75,
-                "CROSS_BORDER" => 70,
-                "CROSS_BORDER_TRANSFER" => 70,
-                "HIGH_RISK_MCC" => 65,
-                "MULTI_SOURCE_FUNDING" => 65,
-                "RECEIVER_BALANCE_ANOMALY" => 60,
-                "CONSECUTIVE_REFUNDS" => 60,
-                "CURRENCY_MISMATCH" => 55,
-                "VELOCITY" => 50,
-                "SMURFING" => 50,
-                "SUSPICIOUS_DESCRIPTION" => 45,
-                _ => 60
-            };
-
-            // 2. Kanal Çarpanı
-            decimal channelFactor = tx.ChannelTypeId switch
-            {
-                2 => 1.3m, // Sanal POS
-                3 => 1.2m, // ATM
-                1 => 1.0m, // POS
-                4 => 1.0m, // Mobil Şube
-                5 => 0.95m, // İnternet Şubesi
-                _ => 1.0m
-            };
- 
-            // 3. İşyeri Kategorisi Çarpanı
-            decimal categoryFactor = 1.0m;
-            if (!string.IsNullOrEmpty(tx.MerchantCategory))
-            {
-                string category = tx.MerchantCategory.ToLower();
-                if (category.Contains("kuyumcu") || category.Contains("kripto") || category.Contains("bahis") || category.Contains("kumar"))
-                    categoryFactor = 1.4m;
-                else if (category.Contains("elektronik") || category.Contains("seyahat") || category.Contains("otel") || category.Contains("konaklama"))
-                    categoryFactor = 1.2m;
-                else if (category.Contains("e-ticaret") || category.Contains("transfer"))
-                    categoryFactor = 1.1m;
-                else if (category.Contains("market") || category.Contains("giyim") || category.Contains("restoran") || category.Contains("yemek"))
-                    categoryFactor = 0.9m;
-            }
- 
-            // 4. İşlem Tipi Çarpanı
-            decimal typeFactor = tx.TransactionTypeId switch
-            {
-                2 => 1.2m, // Refund (İade)
-                _ => 1.0m  // Sale / Transfer
-            };
- 
-            // 5. Para Birimi Çarpanı
-            decimal currencyFactor = (!string.IsNullOrEmpty(tx.Currency) && tx.Currency != "TRY") ? 1.2m : 1.0m;
- 
-            // 6. Konum/Ülke Çarpanı
-            decimal countryFactor = (!string.IsNullOrEmpty(tx.Country) && tx.Country.ToLower() != "türkiye") ? 1.3m : 1.0m;
- 
-            // Katsayıların Bileşkesi (Cap & Floor Kuralları ile)
-            decimal combinedFactor = channelFactor * categoryFactor * typeFactor * currencyFactor * countryFactor;
-            combinedFactor = System.Math.Min(combinedFactor, 1.5m); // Tavan sınırı (Cap)
-            
-            if (ruleWeight >= 80)
-            {
-                combinedFactor = System.Math.Max(combinedFactor, 1.0m); // Kritik kurallar için taban sınırı (Floor)
-            }
- 
-            // 7. Bakiye / Limit Oranı Hesaplama
-            decimal limitOranEtkisi = 0;
-            decimal cardLimit = 0;
-            decimal availableLimit = 0;
- 
-            if (tx is ECreditCardTransaction ccTx && ccTx.CreditCard != null)
-            {
-                cardLimit = ccTx.CreditCard.CardLimit;
-                availableLimit = ccTx.CreditCard.AvailableLimit;
-            }
-            else if (tx is EDebitCardTransaction dcTx && dcTx.DebitCard != null)
-            {
-                cardLimit = 100000; // Varsayılan limit eşiği
-                availableLimit = dcTx.DebitCard.Balance;
-            }
- 
-            if (cardLimit > 0)
-            {
-                decimal spentLimit = System.Math.Max(0, cardLimit - availableLimit);
-                decimal txRatio = (tx.Amount / cardLimit) * 100;
-                decimal spentRatio = (spentLimit / cardLimit) * 100;
-                limitOranEtkisi = (txRatio * 0.6m) + (spentRatio * 0.4m);
-                if (limitOranEtkisi > 100) limitOranEtkisi = 100;
-            }
- 
-            // Hacim Skoru (Tek işlem tutarının büyüklüğü)
-            decimal volumeScore = System.Math.Min((tx.Amount / 50000m) * 100m, 100m);
- 
-            // Dinamik Faktör (%50 Limit Kullanım Oranı + %50 İşlem Hacmi)
-            decimal dynamicFactor = ((limitOranEtkisi * 0.5m) + (volumeScore * 0.5m)) / 100m;
- 
-            // Risk Skoru Hesaplama (Dinamik faktör katkısı 35 puan ile sınırlandırılmıştır)
-            decimal dynamicWeight = System.Math.Min(100m - ruleWeight, 35m);
-            decimal rawScore = (ruleWeight * combinedFactor) + (dynamicWeight * dynamicFactor);
- 
-            int finalScore = (int)System.Math.Round(rawScore);
-            return System.Math.Clamp(finalScore, 1, 100);
+            return ResponseDTO<List<GetUnresolvedLogsResponse>>.Success(filteredResolvedList);
         }
     }
 }

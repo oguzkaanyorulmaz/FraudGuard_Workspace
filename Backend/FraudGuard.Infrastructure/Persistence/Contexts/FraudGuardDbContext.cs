@@ -22,6 +22,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
         public DbSet<ETransactionType> TransactionTypes { get; set; } 
         public DbSet<EUser> Users { get; set; }
         public DbSet<EFraudRule> FraudRules { get; set; }
+        public DbSet<ERuleCombination> RuleCombinations { get; set; }
         public DbSet<EFraudLog> FraudLogs { get; set; }
         public DbSet<EBlockReason> BlockReasons { get; set; }
 
@@ -43,32 +44,13 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
 
 
             // 2. Fraud Rules Seeding
+            // Kural kataloğu ve kombinasyon tanımları ayrı seed sınıflarında tutulur;
+            // yeni dinamik kural eklemek için yalnızca FraudRuleSeedData güncellenir.
             modelBuilder.Entity<EFraudRule>().HasData(
-                new EFraudRule { RuleId = 1, RuleCode = "VELOCITY", RuleName = "Hız / Sıklık Kuralı", Description = "Belirli bir zaman dilimi içinde peş peşe yapılan işlemler", IsActive = true },
-                new EFraudRule { RuleId = 2, RuleCode = "IMPOSSIBLE_TRAVEL", RuleName = "İmkansız Seyahat", Description = "Fiziksel olarak mümkün olmayan süre ve mesafelerdeki işlemler", IsActive = true },
-                new EFraudRule { RuleId = 3, RuleCode = "ANOMALOUS_TIME", RuleName = "Zaman ve Tutar Sapması", Description = "Gece geç saatlerde yapılan olağandışı yüksek tutarlı işlemler", IsActive = true },
-                new EFraudRule { RuleId = 4, RuleCode = "CARD_TESTING", RuleName = "Kart Deneme / Yoklama", Description = "Kartın aktifliğini doğrulamak amacıyla yapılan küçük tutarlı denemeler", IsActive = true },
-                new EFraudRule { RuleId = 5, RuleCode = "BRUTE_FORCE", RuleName = "Ardışık Red", Description = "Kısa süre içinde üst üste alınan işlem reddi durumları", IsActive = true },
-                new EFraudRule { RuleId = 6, RuleCode = "CROSS_BORDER", RuleName = "Sınır Ötesi İlk İşlem", Description = "Kart geçmişinde hiç bulunmayan bir ülkeden yapılan harcamalar", IsActive = true },
-                new EFraudRule { RuleId = 7, RuleCode = "HIGH_RISK_MCC", RuleName = "Yüksek Riskli Üye İşyeri", Description = "Kuyumcu, şans oyunları, kripto borsaları gibi riskli kategorilerden yapılan işlemler", IsActive = true },
-                new EFraudRule { RuleId = 8, RuleCode = "MAX_OUT", RuleName = "Limit Boşaltma Denemesi", Description = "Kart limitinin tamamına yakınını (%95+) tek seferde harcama denemesi", IsActive = true },
-                new EFraudRule { RuleId = 9, RuleCode = "CURRENCY_MISMATCH", RuleName = "Para Birimi Sapması", Description = "Müşterinin kart geçmişinde bulunmayan bir para birimiyle işlem denemesi", IsActive = true },
-                new EFraudRule { RuleId = 10, RuleCode = "CONSECUTIVE_REFUNDS", RuleName = "Ardışık İade Kuralı", Description = "Kısa süre içerisinde üst üste yapılan şüpheli iade (Refund) işlemleri denemesi", IsActive = true },
-                new EFraudRule { RuleId = 11, RuleCode = "SMURFING", RuleName = "Smurfing (Dilimleme)", Description = "Son 1 saatteki transferlerin bildirim limitini aşması", IsActive = true },
-                new EFraudRule { RuleId = 12, RuleCode = "WALLET_CASHOUT", RuleName = "Wallet Cash-Out", Description = "Cüzdan fonlanmasından hemen sonra EFT ile çıkış yapılması", IsActive = true },
-                new EFraudRule { RuleId = 13, RuleCode = "MULTI_SOURCE_FUNDING", RuleName = "Çoklu Kaynakla Fonlama", Description = "Aynı cüzdana kısa sürede farklı kartlarla bakiye yüklenmesi", IsActive = true },
-                new EFraudRule { RuleId = 14, RuleCode = "CROSS_BORDER_TRANSFER", RuleName = "Sınır Ötesi Transfer", Description = "İlk defa yurt dışı IBAN'a yüksek tutarlı EFT yollanması", IsActive = true },
-                new EFraudRule { RuleId = 15, RuleCode = "ACCOUNT_DRAIN", RuleName = "Hesap Boşaltma Denemesi", Description = "Tek işlemde hesap bakiyesinin %98 ve üzerini çekme denemesi", IsActive = true },
-                new EFraudRule { RuleId = 16, RuleCode = "NEW_BENEFICIARY_TRANSFER", RuleName = "Yeni Alıcı Transfer Anormalliği", Description = "Yeni eklenen alıcıya ilk 5 dakikada yüksek transfer yapılması", IsActive = true },
-                new EFraudRule { RuleId = 17, RuleCode = "SUSPICIOUS_DESCRIPTION", RuleName = "Şüpheli İşlem Açıklaması", Description = "Açıklamada bahis, kripto vb. yasaklı kelimelerin bulunması", IsActive = true },
-                new EFraudRule { RuleId = 18, RuleCode = "HIGH_RISK_RECEIVER", RuleName = "Şüpheli Alıcı/Katır Hesap", Description = "Gönderilen IBAN'ın sistemde kara listede olması", IsActive = true },
-                new EFraudRule { RuleId = 19, RuleCode = "MULTI_SENDER_TO_SINGLE_RECEIVER", RuleName = "Tek Alıcıya Çoklu Gönderim", Description = "Aynı alıcıya kısa sürede farklı kişilerden para transferi", IsActive = true },
-                new EFraudRule { RuleId = 20, RuleCode = "RECEIVER_BALANCE_ANOMALY", RuleName = "Katır Hesap Bakiye Sapması", Description = "Pasif hesaba ani bakiye gelip 1 saatte nakit çekilmeye çalışılması", IsActive = true },
-                new EFraudRule { RuleId = 22, RuleCode = "HIGH_VALUE_REFUND_VOID", RuleName = "Yüksek Tutarlı İade Kuralı", Description = "Tek seferde 10.000 TL ve üzerinde İade (Refund) işlemi yapılması", IsActive = true },
-                new EFraudRule { RuleId = 23, RuleCode = "DEPOSIT_AND_RUN", RuleName = "Yatır ve Kaç Kuralı", Description = "Son 10 dakika içinde hesaba ATM'den para yatırıldıktan hemen sonra bu tutarın %90'ından fazlasının harcanmak istenmesi", IsActive = true },
-                new EFraudRule { RuleId = 24, RuleCode = "DEPOSIT_LIMIT_AVOIDANCE", RuleName = "Yapılandırılmış Aklama (Deposit Limit Avoidance)", Description = "Son 24 saat içinde 3 veya daha fazla farklı ATM'den toplamda 40.000 TL ve üzeri para yatırma denemesi", IsActive = true },
-                new EFraudRule { RuleId = 25, RuleCode = "ANOMALOUS_DEPOSIT_TIME", RuleName = "Gece Yarısı Nakit Akışı", Description = "Gece geç saatte (23:00-06:00) ATM'den 10.000 TL ve üzeri nakit para yatırılması", IsActive = true }
-            );
+                FraudGuard.Infrastructure.Persistence.SeedData.FraudRuleSeedData.GetRules());
+
+            modelBuilder.Entity<ERuleCombination>().HasData(
+                FraudGuard.Infrastructure.Persistence.SeedData.RuleCombinationSeedData.GetCombinations());
 
             // 3. Block Reasons Seeding
             modelBuilder.Entity<EBlockReason>().HasData(

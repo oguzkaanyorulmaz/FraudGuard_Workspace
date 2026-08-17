@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using FraudGuard.Application.Interfaces;
+using FraudGuard.Application.DTOs.RuleManagement;
 using System.Threading.Tasks;
 
 namespace FraudGuard.API.Controllers
@@ -19,11 +20,48 @@ namespace FraudGuard.API.Controllers
         public async Task<IActionResult> GetActiveRules()
         {
             var response = await _ruleManagementAppService.GetActiveRulesAsync();
-            
-            if (response.IsSuccess)
-                return Ok(response);
-                
-            return BadRequest(response);
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>Pasifler dahil tüm kural kataloğu.</summary>
+        [HttpGet("all-rules")]
+        public async Task<IActionResult> GetAllRules()
+        {
+            var response = await _ruleManagementAppService.GetAllRulesAsync();
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// İfadelerde kullanılabilecek alanların listesi.
+        /// <c>isPopulated=false</c> olan alanlar çalışma anında dolmaz; onları kullanan kural tetiklenmez.
+        /// </summary>
+        [HttpGet("available-fields")]
+        public IActionResult GetAvailableFields()
+        {
+            var response = _ruleManagementAppService.GetAvailableFields();
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// Bir ifadeyi kaydetmeden derleyip doğrular. Kural yazarken ilk uğranacak uç.
+        /// </summary>
+        [HttpPost("validate-expression")]
+        public async Task<IActionResult> ValidateExpression([FromBody] ValidateExpressionRequest request)
+        {
+            var response = await _ruleManagementAppService.ValidateExpressionAsync(request);
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// Yeni dinamik kural ekler. İfade derlenemezse kural kaydedilmez.
+        /// Kaydedilen kural, motor kural listesini önbelleğe almadığı için
+        /// bir sonraki işlemden itibaren devrededir; yeniden başlatma gerekmez.
+        /// </summary>
+        [HttpPost("rules")]
+        public async Task<IActionResult> CreateRule([FromBody] CreateFraudRuleRequest request)
+        {
+            var response = await _ruleManagementAppService.CreateRuleAsync(request);
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
         }
     }
 }

@@ -1,189 +1,389 @@
-using FraudGuard.Domain.DomainObjects.TransactionProcessing;
+using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Domain.Common.Enums;
+using FraudGuard.Domain.DomainObjects.FraudEvaluation;
+using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
-using FraudGuard.Domain.Interfaces.DomainServices;
-using FraudGuard.Domain.Interfaces.Repositories;
 using FraudGuard.Domain.Interfaces.Abstractions;
-using FraudGuard.Domain.Interfaces.Rules;
+using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Entities;
+using FraudGuard.Domain.Interfaces.Repositories;
+using FraudGuard.Domain.Services.RuleEngine;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 
 namespace FraudGuard.Domain.Services
 {
+    /// <summary>
+    /// Fraud değerlendirmesinin orkestratörü. Motorların sırasını ve veri akışını yönetir,
+    /// kural mantığının kendisini içermez.
+    /// <para>
+    /// Akış: geçmiş yükle → sayaçları zenginleştir → tüm kuralları çalıştır →
+    /// kombinasyon bonusu → güven indirimi → kademeli karar.
+    /// </para>
+    /// </summary>
     public class FraudEvaluationService : IFraudEvaluationService
     {
+        private static readonly TimeSpan HistoryWindow = TimeSpan.FromHours(24);
+        private static readonly TimeSpan HistoryCacheTtl = TimeSpan.FromMinutes(5);
+
         private readonly ITransactionRepository _transactionRepository;
         private readonly ICreditCardRepository _creditCardRepository;
         private readonly IDebitCardRepository _debitCardRepository;
+        private readonly ICustomerRepository _customerRepository;
         private readonly IFraudRuleRepository _fraudRuleRepository;
         private readonly IFraudLogRepository _fraudLogRepository;
-        private readonly IEnumerable<IFraudRule> _rules;
+        private readonly IRuleCombinationRepository _combinationRepository;
+        private readonly IDynamicRuleEngine _ruleEngine;
+        private readonly ICombinationEngine _combinationEngine;
+        private readonly ITrustScoreService _trustScoreService;
         private readonly ICacheProvider _cacheProvider;
 
         public FraudEvaluationService(
             ITransactionRepository transactionRepository,
             ICreditCardRepository creditCardRepository,
             IDebitCardRepository debitCardRepository,
+            ICustomerRepository customerRepository,
             IFraudRuleRepository fraudRuleRepository,
             IFraudLogRepository fraudLogRepository,
-            IEnumerable<IFraudRule> rules,
+            IRuleCombinationRepository combinationRepository,
+            IDynamicRuleEngine ruleEngine,
+            ICombinationEngine combinationEngine,
+            ITrustScoreService trustScoreService,
             ICacheProvider cacheProvider)
         {
             _transactionRepository = transactionRepository;
             _creditCardRepository = creditCardRepository;
             _debitCardRepository = debitCardRepository;
+            _customerRepository = customerRepository;
             _fraudRuleRepository = fraudRuleRepository;
             _fraudLogRepository = fraudLogRepository;
-            _rules = rules;
+            _combinationRepository = combinationRepository;
+            _ruleEngine = ruleEngine;
+            _combinationEngine = combinationEngine;
+            _trustScoreService = trustScoreService;
             _cacheProvider = cacheProvider;
         }
 
-        public async Task<(string? RuleCode, string? FraudReason)> EvaluateAsync(ProcessTransactionInput input, int cardId)
+        public async Task<FraudDecisionResult> EvaluateAsync(
+            ProcessTransactionInput input, int cardId, bool isCreditCard)
         {
-            return await EvaluateAllRulesAsync(input);
-        }
+            var history = await LoadRecentHistoryAsync(input);
 
-        public async Task<(string? RuleCode, string? FraudReason)> EvaluateAllRulesAsync(ProcessTransactionInput input)
-        {
-            List<ITransaction> recentTransactions = null!;
-            string cacheKey = !string.IsNullOrEmpty(input.CardNumber) 
-                ? $"recent_txs_{input.CardNumber}" 
-                : (!string.IsNullOrEmpty(input.SenderIBAN) ? $"recent_txs_{input.SenderIBAN}" : string.Empty);
-
-            if (!string.IsNullOrEmpty(cacheKey))
+            decimal cardLimit = 0m;
+            decimal cardBalance = 0m;
+            if (cardId > 0)
             {
-                if (!string.IsNullOrEmpty(input.CardNumber))
+                if (isCreditCard)
                 {
-                    var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                    var cc = await _creditCardRepository.GetByIdAsync(cardId);
                     if (cc != null)
                     {
-                        var ccTxs = await _cacheProvider.GetAsync<List<ECreditCardTransaction>>(cacheKey);
-                        if (ccTxs != null) recentTransactions = ccTxs.Cast<ITransaction>().ToList();
-                    }
-                    else
-                    {
-                        var dc = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
-                        if (dc != null)
-                        {
-                            var dcTxs = await _cacheProvider.GetAsync<List<EDebitCardTransaction>>(cacheKey);
-                            if (dcTxs != null) recentTransactions = dcTxs.Cast<ITransaction>().ToList();
-                        }
+                        cardLimit = cc.CardLimit;
+                        cardBalance = cc.AvailableLimit;
                     }
                 }
-                else if (!string.IsNullOrEmpty(input.SenderIBAN))
+                else
                 {
-                    var trans = await _cacheProvider.GetAsync<List<ETransferTransaction>>(cacheKey);
-                    if (trans != null) recentTransactions = trans.Cast<ITransaction>().ToList();
-                }
-            }
-
-            if (recentTransactions == null)
-            {
-                recentTransactions = new List<ITransaction>();
-                if (!string.IsNullOrEmpty(input.CardNumber))
-                {
-                    var cc = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
-                    if (cc != null)
-                    {
-                        var ccTxs = await _transactionRepository.GetRecentTransactionsAsync(cc.CardId, isCreditCard: true, TimeSpan.FromHours(24));
-                        recentTransactions = ccTxs;
-                        if (!string.IsNullOrEmpty(cacheKey) && ccTxs.Count > 0)
-                        {
-                            await _cacheProvider.SetAsync(cacheKey, ccTxs.Cast<ECreditCardTransaction>().ToList(), TimeSpan.FromMinutes(5));
-                        }
-                    }
-                    else
-                    {
-                        var dc = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
-                        if (dc != null)
-                        {
-                            var dcTxs = await _transactionRepository.GetRecentTransactionsAsync(dc.CardId, isCreditCard: false, TimeSpan.FromHours(24));
-                            recentTransactions = dcTxs;
-                            if (!string.IsNullOrEmpty(cacheKey) && dcTxs.Count > 0)
-                            {
-                                await _cacheProvider.SetAsync(cacheKey, dcTxs.Cast<EDebitCardTransaction>().ToList(), TimeSpan.FromMinutes(5));
-                            }
-                        }
-                    }
-                }
-                else if (!string.IsNullOrEmpty(input.SenderIBAN))
-                {
-                    var dc = await _debitCardRepository.GetByIBANAsync(input.SenderIBAN);
+                    var dc = await _debitCardRepository.GetByIdAsync(cardId);
                     if (dc != null)
                     {
-                        var transTxs = await _transactionRepository.GetRecentTransferTransactionsBySenderIBANAsync(input.SenderIBAN, TimeSpan.FromHours(24));
-                        recentTransactions = transTxs.Cast<ITransaction>().ToList();
-                        if (!string.IsNullOrEmpty(cacheKey) && transTxs.Count > 0)
-                        {
-                            await _cacheProvider.SetAsync(cacheKey, transTxs, TimeSpan.FromMinutes(5));
-                        }
+                        cardLimit = dc.Balance;
+                        cardBalance = dc.Balance;
                     }
                 }
             }
+
+            TransactionInputEnricher.Enrich(input, history, cardLimit, cardBalance);
 
             var activeRules = await _fraudRuleRepository.GetAllActiveRulesAsync();
-            var activeRuleCodes = activeRules.Where(r => r.IsActive).Select(r => r.RuleCode).ToHashSet();
+            var outcome = await _ruleEngine.EvaluateAsync(input, activeRules, history);
 
-            foreach (var rule in _rules)
-            {
-                if (activeRuleCodes.Contains(rule.RuleCode))
-                {
-                    // İade işlemleri sadece iade kurallarına (CONSECUTIVE_REFUNDS, HIGH_VALUE_REFUND_VOID) tabi tutulsun
-                    if (input.TransactionType == TransactionTypeEnum.Refund && 
-                        rule.RuleCode != "CONSECUTIVE_REFUNDS" && 
-                        rule.RuleCode != "HIGH_VALUE_REFUND_VOID")
-                    {
-                        continue;
-                    }
+            if (outcome.Triggered.Count == 0)
+                return FraudDecisionResult.Clean(outcome.Failures);
 
-                    // Satış işlemleri iade kurallarından muaf tutulsun
-                    if (input.TransactionType == TransactionTypeEnum.Sale && 
-                        (rule.RuleCode == "CONSECUTIVE_REFUNDS" || rule.RuleCode == "HIGH_VALUE_REFUND_VOID"))
-                    {
-                        continue;
-                    }
+            var combinationDefinitions = await _combinationRepository.GetAllActiveAsync();
+            var appliedCombinations = _combinationEngine.Evaluate(outcome.Triggered, combinationDefinitions);
 
-                    var (isSuspicious, reason) = await rule.EvaluateAsync(input, recentTransactions);
-                    if (isSuspicious)
-                    {
-                        return (rule.RuleCode, reason);
-                    }
-                }
-            }
+            var trustContext = await BuildTrustContextAsync(cardId, isCreditCard);
+            var trust = _trustScoreService.Evaluate(trustContext);
 
-            return (null, null);
+            return BuildDecision(outcome, appliedCombinations, trust);
         }
 
-        public async Task CreateFraudLogAsync(int transactionId, string ruleCode, PaymentTypeEnum paymentType)
+        // ------------------------------------------------------------------
+        // Skorlama ve karar
+        // ------------------------------------------------------------------
+
+        private static FraudDecisionResult BuildDecision(
+            RuleEvaluationOutcome outcome,
+            IReadOnlyList<AppliedCombination> appliedCombinations,
+            TrustAssessment trust)
+        {
+            var triggeredRules = outcome.Triggered;
+
+            int cardRaw = SumScores(triggeredRules, RuleTargetEnum.Card);
+            int merchantRaw = SumScores(triggeredRules, RuleTargetEnum.Merchant);
+
+            int cardBonus = SumBonuses(appliedCombinations, RuleTargetEnum.Card);
+            int merchantBonus = SumBonuses(appliedCombinations, RuleTargetEnum.Merchant);
+
+            int cardBeforeTrust = cardRaw + cardBonus;
+            int merchantBeforeTrust = merchantRaw + merchantBonus;
+
+            int cardFinal = Math.Min(100, Floor(cardBeforeTrust - trust.CardDiscount));
+            int merchantFinal = Math.Min(100, Floor(merchantBeforeTrust - trust.MerchantDiscount));
+
+            // Fiilen uygulanan indirim: taban sıfır olduğu için tanımlı indirimden düşük olabilir.
+            int appliedDiscount = (cardBeforeTrust - cardFinal) + (merchantBeforeTrust - merchantFinal);
+
+            int decisiveScore = Math.Min(100, Math.Max(cardFinal, merchantFinal));
+
+            return new FraudDecisionResult
+            {
+                Decision = ResolveDecision(decisiveScore),
+                CardRiskScore = cardFinal,
+                MerchantRiskScore = merchantFinal,
+                RawRuleScore = cardRaw + merchantRaw,
+                TotalBonusScore = cardBonus + merchantBonus,
+                TotalTrustDiscount = appliedDiscount,
+                TriggeredRules = triggeredRules,
+                AppliedCombinations = appliedCombinations,
+                TrustFactors = trust.AppliedFactors,
+                Failures = outcome.Failures
+            };
+        }
+
+        private static RiskDecisionEnum ResolveDecision(int score) => score switch
+        {
+            >= RiskScoringConstants.RetBlokeThreshold => RiskDecisionEnum.RetBloke,
+            >= RiskScoringConstants.EkDogrulamaThreshold => RiskDecisionEnum.EkDogrulama,
+            >= RiskScoringConstants.IzleThreshold => RiskDecisionEnum.Izle,
+            _ => RiskDecisionEnum.Normal
+        };
+
+        private static int SumScores(IReadOnlyList<TriggeredRule> rules, RuleTargetEnum target) =>
+            rules.Where(r => r.Target == target).Sum(r => r.Score);
+
+        private static int SumBonuses(IReadOnlyList<AppliedCombination> combinations, RuleTargetEnum target) =>
+            combinations.Where(c => c.Target == target).Sum(c => c.BonusScore);
+
+        private static int Floor(int score) =>
+            Math.Max(RiskScoringConstants.MinimumRiskScore, score);
+
+        // ------------------------------------------------------------------
+        // Güven skoru verisinin toplanması
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Güven faktörlerinin ham verisini toplar. Hesabı <see cref="ITrustScoreService"/> yapar.
+        /// <para>
+        /// İşyeri tarafı, Merchant master verisi sisteme eklenene kadar boş bırakılır;
+        /// bu durumda işyeri indirimi uygulanmaz.
+        /// </para>
+        /// </summary>
+        private async Task<TrustContext> BuildTrustContextAsync(int cardId, bool isCreditCard)
+        {
+            if (cardId <= 0)
+                return new TrustContext();
+
+            int? tenureDays = await ResolveCardHolderTenureAsync(cardId, isCreditCard);
+
+            int alarmCount = await _fraudLogRepository.CountRecentAlarmsForCardAsync(
+                cardId,
+                isCreditCard,
+                DateTime.Now.AddDays(-RiskScoringConstants.NoAlarmLookbackDays));
+
+            return new TrustContext
+            {
+                CardHolderTenureDays = tenureDays,
+                CardAlarmCountLast90Days = alarmCount,
+                IsCardWhitelisted = false,
+
+                // Merchant domain'i eklenmeden işyeri güven geçmişi bilinemez.
+                MerchantTenureDays = null,
+                MerchantAlarmCountLast90Days = null,
+                IsMerchantWhitelisted = false
+            };
+        }
+
+        private async Task<int?> ResolveCardHolderTenureAsync(int cardId, bool isCreditCard)
+        {
+            int customerId;
+
+            if (isCreditCard)
+            {
+                var creditCard = await _creditCardRepository.GetByIdAsync(cardId);
+                if (creditCard is null) return null;
+                customerId = creditCard.CustomerId;
+            }
+            else
+            {
+                var debitCard = await _debitCardRepository.GetByIdAsync(cardId);
+                if (debitCard is null) return null;
+                customerId = debitCard.CustomerId;
+            }
+
+            var customer = await _customerRepository.GetByIdAsync(customerId);
+            if (customer is null) return null;
+
+            return (int)Math.Max(0, (DateTime.Now - customer.CreatedAt).TotalDays);
+        }
+
+        // ------------------------------------------------------------------
+        // İşlem geçmişi
+        // ------------------------------------------------------------------
+
+        private async Task<List<ITransaction>> LoadRecentHistoryAsync(ProcessTransactionInput input)
+        {
+            string cacheKey = BuildHistoryCacheKey(input);
+
+            if (string.IsNullOrEmpty(cacheKey))
+                return new List<ITransaction>();
+
+            var cached = await ReadHistoryFromCacheAsync(input, cacheKey);
+            if (cached is not null)
+                return cached;
+
+            return await ReadHistoryFromStoreAsync(input, cacheKey);
+        }
+
+        private static string BuildHistoryCacheKey(ProcessTransactionInput input)
+        {
+            if (!string.IsNullOrEmpty(input.CardNumber))
+                return $"recent_txs_{input.CardNumber}";
+
+            if (!string.IsNullOrEmpty(input.SenderIBAN))
+                return $"recent_txs_{input.SenderIBAN}";
+
+            return string.Empty;
+        }
+
+        private async Task<List<ITransaction>?> ReadHistoryFromCacheAsync(
+            ProcessTransactionInput input, string cacheKey)
+        {
+            if (!string.IsNullOrEmpty(input.CardNumber))
+            {
+                var creditCard = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                if (creditCard != null)
+                {
+                    var cached = await _cacheProvider.GetAsync<List<ECreditCardTransaction>>(cacheKey);
+                    return cached?.Cast<ITransaction>().ToList();
+                }
+
+                var debitCard = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
+                if (debitCard != null)
+                {
+                    var cached = await _cacheProvider.GetAsync<List<EDebitCardTransaction>>(cacheKey);
+                    return cached?.Cast<ITransaction>().ToList();
+                }
+
+                return null;
+            }
+
+            var cachedTransfers = await _cacheProvider.GetAsync<List<ETransferTransaction>>(cacheKey);
+            return cachedTransfers?.Cast<ITransaction>().ToList();
+        }
+
+        private async Task<List<ITransaction>> ReadHistoryFromStoreAsync(
+            ProcessTransactionInput input, string cacheKey)
+        {
+            if (!string.IsNullOrEmpty(input.CardNumber))
+            {
+                var creditCard = await _creditCardRepository.GetByCardNumberAsync(input.CardNumber);
+                if (creditCard != null)
+                {
+                    var transactions = await _transactionRepository.GetRecentTransactionsAsync(
+                        creditCard.CardId, isCreditCard: true, HistoryWindow);
+
+                    if (transactions.Count > 0)
+                    {
+                        await _cacheProvider.SetAsync(
+                            cacheKey, transactions.Cast<ECreditCardTransaction>().ToList(), HistoryCacheTtl);
+                    }
+
+                    return transactions;
+                }
+
+                var debitCard = await _debitCardRepository.GetByCardNumberAsync(input.CardNumber);
+                if (debitCard != null)
+                {
+                    var transactions = await _transactionRepository.GetRecentTransactionsAsync(
+                        debitCard.CardId, isCreditCard: false, HistoryWindow);
+
+                    if (transactions.Count > 0)
+                    {
+                        await _cacheProvider.SetAsync(
+                            cacheKey, transactions.Cast<EDebitCardTransaction>().ToList(), HistoryCacheTtl);
+                    }
+
+                    return transactions;
+                }
+
+                return new List<ITransaction>();
+            }
+
+            if (!string.IsNullOrEmpty(input.SenderIBAN))
+            {
+                var senderAccount = await _debitCardRepository.GetByIBANAsync(input.SenderIBAN);
+                if (senderAccount != null)
+                {
+                    var transfers = await _transactionRepository
+                        .GetRecentTransferTransactionsBySenderIBANAsync(input.SenderIBAN, HistoryWindow);
+
+                    if (transfers.Count > 0)
+                        await _cacheProvider.SetAsync(cacheKey, transfers, HistoryCacheTtl);
+
+                    return transfers.Cast<ITransaction>().ToList();
+                }
+            }
+
+            return new List<ITransaction>();
+        }
+
+        // ------------------------------------------------------------------
+        // Fraud log
+        // ------------------------------------------------------------------
+
+        public async Task CreateFraudLogAsync(
+            int transactionId, 
+            string ruleCode, 
+            PaymentTypeEnum paymentType,
+            bool isAutoBlocked = false,
+            string? resolvedBy = null,
+            string? adminNote = null)
         {
             var rule = await _fraudRuleRepository.GetByCodeAsync(ruleCode);
-            if (rule != null && rule.IsActive)
+            if (rule is null || !rule.IsActive)
+                return;
+
+            var log = new EFraudLog
             {
-                var log = new EFraudLog
-                {
-                    RuleId = rule.RuleId,
-                    LogDate = DateTime.Now,
-                    Status = "Unresolved"
-                };
+                RuleId = rule.RuleId,
+                LogDate = DateTime.Now,
+                IsResolved = isAutoBlocked,
+                Status = isAutoBlocked ? "Resolved" : "Unresolved",
+                AdminAction = isAutoBlocked ? "BLOCKED" : null,
+                ResolvedByAdmin = isAutoBlocked ? (resolvedBy ?? "Sistem (Otomatik Bloke)") : null,
+                AdminNote = isAutoBlocked ? (adminNote ?? "Sistem tarafından şüpheli ve yüksek riskli bulunup direkt bloke edildi.") : null
+            };
 
-                if (paymentType == PaymentTypeEnum.CreditCard)
-                {
+            switch (paymentType)
+            {
+                case PaymentTypeEnum.CreditCard:
                     log.CreditCardTransactionId = transactionId;
-                }
-                else if (paymentType == PaymentTypeEnum.DebitCard)
-                {
+                    break;
+                case PaymentTypeEnum.DebitCard:
                     log.DebitCardTransactionId = transactionId;
-                }
-                else if (paymentType == PaymentTypeEnum.EFT || paymentType == PaymentTypeEnum.BankTransfer)
-                {
+                    break;
+                case PaymentTypeEnum.EFT:
+                case PaymentTypeEnum.BankTransfer:
                     log.TransferTransactionId = transactionId;
-                }
-
-                await _fraudLogRepository.AddAsync(log);
+                    break;
             }
+
+            await _fraudLogRepository.AddAsync(log);
         }
     }
 }

@@ -58,9 +58,10 @@ public async Task<bool> ResolveFraudLogAsync(
         {
             decimal convertedAmount = await _currencyService.ConvertToTryAsync(log.Transaction.Amount, log.Transaction.Currency);
 
-            if (adminAction == "MarkAsSafe" || adminAction == "APPROVE" || adminAction == "Approve")
+            if (adminAction == "MarkAsSafe" || adminAction == "APPROVE" || adminAction == "Approve" || adminAction == "APPROVED")
             {
                 log.Transaction.Status = "Approved";
+                log.Transaction.DeclineReason = null;
 
                 if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.ReceiverIBAN))
                 {
