@@ -23,6 +23,12 @@ namespace FraudGuard.Domain.Interfaces.Entities
         string Location { get; }
         string Country { get; }
         string? MerchantCategory { get; }
+
+        /// <summary>
+        /// İşlemin gerçekleştiği üye işyerinin kodu. İşyeri bazlı sayaçlar bu alan üzerinden
+        /// hesaplanır. İşyeri seçilmeden gönderilen işlemlerde ve transferlerde null'dır.
+        /// </summary>
+        string? MerchantId { get; }
         string Status { get; set; }
         string? DeclineReason { get; set; }
         string? FraudReason { get; set; }

@@ -15,6 +15,12 @@ namespace FraudGuard.Domain.Interfaces.Repositories
 
         // Kural kontrolleri ve geçmiş sorguları
         Task<List<ITransaction>> GetRecentTransactionsAsync(int cardId, bool isCreditCard, TimeSpan timeWindow);
+
+        /// <summary>
+        /// Bir üye işyerinde verilen pencerede gerçekleşen işlemler. Kredi ve banka kartı
+        /// işlemlerinin ikisini de kapsar; işyeri bazlı sayaçlar bunun üzerinden hesaplanır.
+        /// </summary>
+        Task<List<ITransaction>> GetRecentTransactionsByMerchantAsync(string merchantId, TimeSpan timeWindow);
         Task<bool> HasAnySuspiciousTransactionAsync(int cardId, bool isCreditCard);
         Task<List<ITransaction>> GetLast10TransactionsForCardAsync(int cardId, bool isCreditCard, DateTime beforeDate);
         Task<List<ITransaction>> GetLast10SuspiciousTransactionsForCardAsync(int cardId, bool isCreditCard, DateTime beforeDate);

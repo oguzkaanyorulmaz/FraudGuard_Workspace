@@ -19,6 +19,10 @@ namespace FraudGuard.Domain.Entities
         public string Location { get; set; }
         public string Country { get; set; }
         public string MerchantCategory { get; set; }
+
+        /// <summary>İşlemin geçtiği üye işyeri. İşyeri seçilmeden gönderilen işlemlerde null.</summary>
+        public string? MerchantId { get; set; }
+
         public string Status { get; set; }
         public string? DeclineReason { get; set; }
         public string? FraudReason { get; set; }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
+using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Entities;
 
 namespace FraudGuard.Domain.Services.RuleEngine
@@ -15,9 +16,9 @@ namespace FraudGuard.Domain.Services.RuleEngine
     /// hesaplanır: "aynı kartla 3 işlem" koşulu, geçmişteki 2 işlem + mevcut işlem ile sağlanır.
     /// </para>
     /// <para>
-    /// Kapsam: geçmiş, karta/IBAN'a ait son 24 saattir. İşyeri bazlı sayaçlar (farklı kart sayısı,
-    /// işyeri cirosu vb.) Merchant master verisi sisteme eklenene kadar hesaplanamaz ve
-    /// varsayılan değerlerinde kalır.
+    /// Kapsam iki ayrı geçmiştir: karta/IBAN'a ait son 24 saat ve — işlem bir üye işyerine
+    /// bağlıysa — o işyerine ait son 24 saat. İşyeri geçmişi verilmezse işyeri bazlı sayaçlar
+    /// varsayılan değerlerinde kalır ve onları kullanan kurallar tetiklenmez.
     /// </para>
     /// </summary>
     public static class TransactionInputEnricher
@@ -26,12 +27,43 @@ namespace FraudGuard.Domain.Services.RuleEngine
         private const int NightStartHour = 22;
         private const int NightEndHour = 6;
 
+        /// <summary>
+        /// <see cref="ProcessTransactionInput"/> üzerinde tanımlı olup bu enricher'ın
+        /// <b>doldurmadığı</b> alanlar ve nedenleri.
+        /// <para>
+        /// Böyle bir alanı kullanan kural derlenir, kaydedilir ve katalogda aktif görünür —
+        /// ama alan varsayılan değerinde kaldığı için hiç tetiklenmez ve
+        /// <c>ruleFailures</c>'a da düşmez. Yani sessizce ölüdür. Kural yazma arayüzü bu listeyi
+        /// okuyup yazarı önden uyarır.
+        /// </para>
+        /// <para>
+        /// Liste bilinçli olarak enricher'ın yanında durur: bir alanın dolup dolmadığı bu sınıfın
+        /// davranışıdır, başka bir katmanın bilgisi değil. Buraya yeni bir sayaç eklendiğinde
+        /// ilgili satır <b>silinmelidir</b>; hesaplanmayan yeni bir alan eklendiğinde ise
+        /// buraya <b>eklenmelidir</b>.
+        /// </para>
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> UnpopulatedFields =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["KisaSuredeFarkliKartlaFonlamaSayisi"] =
+                    "Cüzdan fonlama geçmişi izlenmiyor; bu sayaç hesaplanmıyor.",
+                ["KatirHesapBakiyeAnormalligiVarMi"] =
+                    "Alıcı hesabın bakiye hareketi izlenmiyor; bu gösterge hesaplanmıyor."
+            };
+
         public static ProcessTransactionInput Enrich(
             ProcessTransactionInput input,
             IReadOnlyList<ITransaction> history,
             decimal cardLimit = 0m,
             decimal cardBalance = 0m,
-            DateTime? evaluatedAt = null)
+            DateTime? evaluatedAt = null,
+            EMerchant? merchant = null,
+            IReadOnlyList<ITransaction>? merchantHistory = null,
+            int cardId = 0,
+            bool isCreditCard = true,
+            IReadOnlyList<ITransaction>? receiverHistory = null,
+            bool isReceiverBlocked = false)
         {
             var now = evaluatedAt ?? DateTime.Now;
 
@@ -47,8 +79,118 @@ namespace FraudGuard.Domain.Services.RuleEngine
             ApplyDiversityCounters(input, window24H);
             ApplyLimitAndBalance(input, cardLimit, cardBalance);
             ApplySecurityAndPatternIndicators(input, window24H, now);
+            ApplyMerchantFields(input, merchant, merchantHistory, window24H, now, cardId, isCreditCard);
+            ApplyTransferIndicators(input, window24H, receiverHistory, isReceiverBlocked, now);
 
             return input;
+        }
+
+        /// <summary>
+        /// Alıcı tarafına bakan transfer göstergelerini yazar.
+        /// <para>
+        /// <see cref="ProcessTransactionInput.YeniAliciMi"/> ve
+        /// <see cref="ProcessTransactionInput.CuzdanFonlamaSonrasiNakitCikisVarMi"/> gönderenin kendi
+        /// geçmişinden hesaplanabilir. Buna karşılık <see cref="ProcessTransactionInput.RiskliAliciMi"/>
+        /// ve <see cref="ProcessTransactionInput.Son1SaatFarkliGondericiSayisi"/> alıcı hesabına ait
+        /// veri gerektirir; bunlar orkestratör tarafından hazır geçilir. Enricher böylece saf kalır.
+        /// </para>
+        /// </summary>
+        private static void ApplyTransferIndicators(
+            ProcessTransactionInput input,
+            IReadOnlyList<ITransaction> window,
+            IReadOnlyList<ITransaction>? receiverHistory,
+            bool isReceiverBlocked,
+            DateTime now)
+        {
+            // Sistemde bloke edilmiş bir hesaba gönderim: katır hesap sinyali.
+            input.RiskliAliciMi = isReceiverBlocked;
+
+            if (receiverHistory is not null)
+            {
+                input.Son1SaatFarkliGondericiSayisi = receiverHistory
+                    .Where(t => (now - t.TransactionDate) <= TimeSpan.FromHours(1))
+                    .Select(t => t.SenderIBAN)
+                    .Where(iban => !string.IsNullOrWhiteSpace(iban))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+            }
+
+            bool isTransfer = input.PaymentType is PaymentTypeEnum.EFT or PaymentTypeEnum.BankTransfer;
+            if (!isTransfer)
+                return;
+
+            // Alıcıya daha önce onaylanmış transfer yoksa "yeni alıcı" sayılır.
+            input.YeniAliciMi =
+                !string.IsNullOrWhiteSpace(input.ReceiverIBAN) &&
+                !window.Any(t => IsApproved(t) &&
+                                 string.Equals(t.ReceiverIBAN, input.ReceiverIBAN, StringComparison.OrdinalIgnoreCase));
+
+            // Hesap son 15 dakika içinde fonlanıp hemen çıkış yapılıyor mu.
+            input.CuzdanFonlamaSonrasiNakitCikisVarMi = window.Any(t =>
+                IsApproved(t) &&
+                t.TransactionTypeId == (int)TransactionTypeEnum.Deposit &&
+                (now - t.TransactionDate) <= TimeSpan.FromMinutes(15));
+        }
+
+        /// <summary>
+        /// İşyeri master verisinden gelen alanları ve işyeri bazlı sayaçları yazar.
+        /// <para>
+        /// İki sayaç farklı yönlere bakar ve karıştırılmamalıdır:
+        /// <see cref="ProcessTransactionInput.FarkliKartSayisi"/> <b>işyeri</b> geçmişinden
+        /// (bu POS'ta kaç farklı kart), <see cref="ProcessTransactionInput.FarkliIsyeriSayisi"/>
+        /// ise <b>kart</b> geçmişinden (bu kart kaç farklı işyerinde) hesaplanır.
+        /// </para>
+        /// </summary>
+        private static void ApplyMerchantFields(
+            ProcessTransactionInput input,
+            EMerchant? merchant,
+            IReadOnlyList<ITransaction>? merchantHistory,
+            IReadOnlyList<ITransaction> cardWindow24H,
+            DateTime now,
+            int cardId,
+            bool isCreditCard)
+        {
+            if (merchant is not null)
+            {
+                input.MerchantId = merchant.MerchantId;
+                input.MccKodu = merchant.MccCode;
+                input.PosTahsisTarihi = merchant.PosAssignmentDate;
+                input.IsyeriYasiGun = (int)Math.Max(0, (now - merchant.PosAssignmentDate).TotalDays);
+            }
+
+            // Kartın gezindiği işyeri çeşitliliği: işyeri kaydı olmasa da kart geçmişinden çıkar.
+            // Mevcut işlem de sayılır, tıpkı diğer çeşitlilik sayaçlarında olduğu gibi.
+            input.FarkliIsyeriSayisi = cardWindow24H
+                .Select(t => t.MerchantId)
+                .Append(input.MerchantId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+
+            if (merchantHistory is null || string.IsNullOrWhiteSpace(input.MerchantId))
+                return;
+
+            // Kart deneme saldırısı işaretidir: aynı POS'ta kısa sürede çok sayıda farklı kart.
+            // Kredi ve banka kartı kimlikleri ayrı sayaç uzaylarında olduğu için ön ek ile ayrılır.
+            var distinctCards = merchantHistory
+                .Where(t => (now - t.TransactionDate) <= TimeSpan.FromHours(1))
+                .Select(CardKey)
+                .Where(key => key is not null)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)!;
+
+            // Değerlendirilen kart da sayılır. HashSet olduğu için geçmişte zaten
+            // görülmüşse tekrar eklenmez — aynı kart iki kez sayılmaz.
+            if (cardId > 0)
+                distinctCards.Add(isCreditCard ? $"C{cardId}" : $"D{cardId}");
+
+            input.FarkliKartSayisi = distinctCards.Count;
+        }
+
+        private static string? CardKey(ITransaction transaction)
+        {
+            if (transaction.CreditCardId is int creditId) return $"C{creditId}";
+            if (transaction.DebitCardId is int debitId) return $"D{debitId}";
+            return null;
         }
 
         private static void ApplyTimeFields(ProcessTransactionInput input, DateTime now)

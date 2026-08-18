@@ -10,6 +10,7 @@ namespace FraudGuard.Application.DTOs.TransactionProcessing
         public int Score { get; set; }
         public string Target { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
+        public bool IsCritical { get; set; }
         public string? Reason { get; set; }
     }
 

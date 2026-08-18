@@ -3,13 +3,12 @@ using FraudGuard.Domain.Common.Enums;
 namespace FraudGuard.Domain.Entities
 {
     /// <summary>
-    /// Kural tanımı. İki tip kuralı tek tabloda taşır:
-    /// <list type="bullet">
-    /// <item><b>Dinamik kural:</b> <see cref="Expression"/> doludur. İfade çalışma anında derlenip
-    /// çalıştırılır, ayrı bir .cs dosyası gerektirmez.</item>
-    /// <item><b>Kod tabanlı kural:</b> <see cref="Expression"/> boştur. <see cref="RuleCode"/> ile eşleşen
-    /// <c>IFraudRule</c> implementasyonu çalıştırılır. Mevcut kurallar bu yolla korunur.</item>
-    /// </list>
+    /// Kural tanımı. Her kural bir <see cref="Expression"/> taşır; ifade çalışma anında derlenip
+    /// çalıştırılır, ayrı bir .cs dosyası gerektirmez. Yeni kural eklemek için bu tabloya
+    /// satır eklemek yeterlidir.
+    /// <para>
+    /// İfadesi boş bırakılan kural değerlendirilemez ve tanım hatası olarak raporlanır.
+    /// </para>
     /// </summary>
     public class EFraudRule
     {
@@ -26,7 +25,10 @@ namespace FraudGuard.Domain.Entities
         /// Çalışma anında derlenen boolean ifade. Tek parametresi <c>input</c> olup
         /// <c>ProcessTransactionInput</c> örneğine bağlanır.
         /// Örn: <c>input.FarkliKartSayisi &gt;= 3 || input.AyniKartIslemAdedi &gt;= 3</c>
-        /// <para>Boş bırakılırsa kural kod tabanlı olarak değerlendirilir.</para>
+        /// <para>
+        /// Zorunludur. Boş bırakılan kural değerlendirilemez; motor onu atlar ve tanım hatası
+        /// olarak <c>ruleFailures</c>'a yazar.
+        /// </para>
         /// </summary>
         public string? Expression { get; set; }
 
@@ -38,6 +40,16 @@ namespace FraudGuard.Domain.Entities
 
         /// <summary>Raporlama amaçlı fraud tipolojisi.</summary>
         public RuleCategoryEnum Category { get; set; } = RuleCategoryEnum.Velocity;
+
+        /// <summary>
+        /// Kesin/yaptırım kuralı mı. İşaretliyse bu kuralın puanı <b>güven indiriminden muaftır</b>.
+        /// <para>
+        /// Gerekçe: whitelist veya temiz geçmiş, kara listedeki bir hesaba gönderim gibi
+        /// deterministik bir yaptırım sinyalini bastırmamalıdır. Sezgisel (heuristic) kurallar
+        /// için işaretlenmemelidir; aksi hâlde güven skoru anlamını yitirir.
+        /// </para>
+        /// </summary>
+        public bool IsCritical { get; set; }
 
         public bool IsActive { get; set; } = true;
 

@@ -32,6 +32,13 @@ namespace FraudGuard.Infrastructure.RuleEngine
         {
             _interpreter = new Interpreter(InterpreterOptions.Default);
             _interpreter.Reference(typeof(ProcessTransactionInput));
+
+            // Atama operatörü kapatılır. Açık bırakılırsa "==" yerine "=" yazmak sessiz bir
+            // tuzak olur: "input.YabanciUlkeMi = true" ifadesi bool döndüğü için doğrulamadan
+            // geçer, ama karşılaştırma yapmak yerine alanı ezip her işlemde true üretir —
+            // üstelik input paylaşıldığı için sonraki kuralların gördüğü veriyi de bozar.
+            // Kapalıyken böyle bir ifade derlenmez ve kural kaydedilirken hata döner.
+            _interpreter.EnableAssignment(AssignmentOperators.None);
         }
 
         public Func<ProcessTransactionInput, bool> Compile(string expression)

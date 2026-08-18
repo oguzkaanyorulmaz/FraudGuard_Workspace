@@ -20,5 +20,11 @@ namespace FraudGuard.Domain.Interfaces.Repositories
         /// Güven skoru hesabında "son 90 günde temiz geçmiş" faktörü için kullanılır.
         /// </summary>
         Task<int> CountRecentAlarmsForCardAsync(int cardId, bool isCreditCard, DateTime since);
+
+        /// <summary>
+        /// Kurala bağlı en az bir fraud logu var mı. Kural silinmeden önce kontrol edilir:
+        /// log varsa silme, geçmiş alarmları koparacağı için reddedilir.
+        /// </summary>
+        Task<bool> AnyByRuleIdAsync(int ruleId);
     }
 }

@@ -40,6 +40,13 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<EFraudRule?> GetByIdAsync(int ruleId)
+        {
+            // Bilinçli olarak takip edilir: dönen örnek üzerinde yapılan değişiklik
+            // SaveChangesAsync ile yazılır, ayrıca Update çağrısı gerekmez.
+            return await _context.FraudRules.FirstOrDefaultAsync(r => r.RuleId == ruleId);
+        }
+
         public async Task<bool> ExistsByCodeAsync(string ruleCode)
         {
             return await _context.FraudRules.AnyAsync(r => r.RuleCode == ruleCode);
@@ -48,6 +55,11 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
         public async Task AddAsync(EFraudRule rule)
         {
             await _context.FraudRules.AddAsync(rule);
+        }
+
+        public void Delete(EFraudRule rule)
+        {
+            _context.FraudRules.Remove(rule);
         }
     }
 }

@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Xml.Linq;
 using System.Threading.Tasks;
-using FraudGuard.Domain.Interfaces.DomainServices;
+using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Domain.Interfaces.Abstractions;
 
 namespace FraudGuard.Infrastructure.Services

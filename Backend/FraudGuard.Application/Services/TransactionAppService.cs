@@ -1,9 +1,8 @@
-using AutoMapper;
+﻿using AutoMapper;
 using FraudGuard.Application.DTOs;
 using FraudGuard.Application.DTOs.TransactionProcessing;
 using FraudGuard.Application.Interfaces;
 using FraudGuard.Application.Validations;
-using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Common.Enums;
 using System.Threading.Tasks;

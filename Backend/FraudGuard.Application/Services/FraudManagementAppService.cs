@@ -1,8 +1,7 @@
-using AutoMapper;
+﻿using AutoMapper;
 using FraudGuard.Application.DTOs;
 using FraudGuard.Application.DTOs.FraudManagement;
 using FraudGuard.Application.Interfaces;
-using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Repositories; 
 using System.Collections.Generic;
 using System.Threading.Tasks;

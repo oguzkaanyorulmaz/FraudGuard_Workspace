@@ -7,6 +7,7 @@ using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Domain.Interfaces.Repositories;
+using FraudGuard.Domain.Services.RuleEngine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,31 +18,31 @@ namespace FraudGuard.Application.Services
     public class RuleManagementAppService : IRuleManagementAppService
     {
         private readonly IFraudRuleRepository _fraudRuleRepository;
+        private readonly IFraudLogRepository _fraudLogRepository;
         private readonly IRuleExpressionCompiler _expressionCompiler;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
 
         /// <summary>
-        /// Modelde tanımlı ama çalışma anında doldurulmayan alanlar.
-        /// Merchant master verisi sisteme eklenene kadar bu alanları kullanan kurallar tetiklenmez.
+        /// Çalışma anında doldurulmayan alanların listesi.
+        /// <para>
+        /// Kaynağı <see cref="TransactionInputEnricher"/>'dır: bir alanın dolup dolmadığı onun
+        /// davranışıdır, bu servisin bilgisi değil. Burada kopyası tutulsaydı ikisi zamanla
+        /// birbirinden kayar ve arayüz ölü bir alanı çalışıyormuş gibi gösterirdi.
+        /// </para>
         /// </summary>
-        private static readonly IReadOnlyDictionary<string, string> UnpopulatedFields =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["MerchantId"] = "Merchant entity'si eklenene kadar boş",
-                ["MccKodu"] = "Merchant entity'si eklenene kadar boş",
-                ["FarkliKartSayisi"] = "İşyeri bazlı sayaç — Merchant verisi gerektirir",
-                ["FarkliIsyeriSayisi"] = "İşyeri bazlı sayaç — Merchant verisi gerektirir",
-                ["PosTahsisTarihi"] = "Merchant entity'si eklenene kadar boş"
-            };
+        private static IReadOnlyDictionary<string, string> UnpopulatedFields =>
+            TransactionInputEnricher.UnpopulatedFields;
 
         public RuleManagementAppService(
             IFraudRuleRepository fraudRuleRepository,
+            IFraudLogRepository fraudLogRepository,
             IRuleExpressionCompiler expressionCompiler,
             IUnitOfWork unitOfWork,
             IMapper mapper)
         {
             _fraudRuleRepository = fraudRuleRepository;
+            _fraudLogRepository = fraudLogRepository;
             _expressionCompiler = expressionCompiler;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -115,6 +116,7 @@ namespace FraudGuard.Application.Services
                 Score = request.Score,
                 Target = target,
                 Category = category,
+                IsCritical = request.IsCritical,
                 IsActive = request.IsActive
             };
 
@@ -131,6 +133,56 @@ namespace FraudGuard.Application.Services
                         : "Kural eklendi, pasif durumda."
                 },
                 "Kural oluşturuldu.");
+        }
+
+        public async Task<ResponseDTO<RuleMutationResponse>> DeleteRuleAsync(int ruleId)
+        {
+            var rule = await _fraudRuleRepository.GetByIdAsync(ruleId);
+            if (rule is null)
+                return ResponseDTO<RuleMutationResponse>.Fail($"{ruleId} numaralı kural bulunamadı.");
+
+            // Fraud logları RuleId üzerinden kurala bağlı ve FK'sı Restrict.
+            // Silmeye kalkışmak veritabanı hatası verir; öncesinde anlaşılır bir yanıt döndürüyoruz.
+            if (await _fraudLogRepository.AnyByRuleIdAsync(ruleId))
+            {
+                return ResponseDTO<RuleMutationResponse>.Fail(
+                    $"'{rule.RuleCode}' kuralı geçmiş fraud alarmlarına bağlı olduğu için silinemez. " +
+                    "Kuralı devre dışı bırakmak için pasife alın.");
+            }
+
+            _fraudRuleRepository.Delete(rule);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ResponseDTO<RuleMutationResponse>.Success(
+                new RuleMutationResponse
+                {
+                    RuleId = rule.RuleId,
+                    RuleCode = rule.RuleCode,
+                    IsActive = false
+                },
+                $"'{rule.RuleCode}' kuralı silindi.");
+        }
+
+        public async Task<ResponseDTO<RuleMutationResponse>> SetRuleStatusAsync(
+            int ruleId, SetRuleStatusRequest request)
+        {
+            var rule = await _fraudRuleRepository.GetByIdAsync(ruleId);
+            if (rule is null)
+                return ResponseDTO<RuleMutationResponse>.Fail($"{ruleId} numaralı kural bulunamadı.");
+
+            rule.IsActive = request.IsActive;
+            await _unitOfWork.SaveChangesAsync();
+
+            return ResponseDTO<RuleMutationResponse>.Success(
+                new RuleMutationResponse
+                {
+                    RuleId = rule.RuleId,
+                    RuleCode = rule.RuleCode,
+                    IsActive = rule.IsActive
+                },
+                rule.IsActive
+                    ? $"'{rule.RuleCode}' kuralı aktifleştirildi, bir sonraki işlemden itibaren devrede."
+                    : $"'{rule.RuleCode}' kuralı pasife alındı, artık değerlendirilmeyecek.");
         }
 
         public ResponseDTO<List<RuleFieldDto>> GetAvailableFields()

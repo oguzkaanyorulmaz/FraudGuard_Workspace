@@ -41,5 +41,8 @@ namespace FraudGuard.Domain.Entities
         public int TransactionTypeId => 4; // Transfer
         public PaymentTypeEnum PaymentType => PaymentTypeEnum.EFT; // Ya da BankTransfer
         public string? MerchantCategory => "Transfer";
+
+        /// <summary>Transferin bir üye işyeri yoktur.</summary>
+        public string? MerchantId => null;
     }
 }

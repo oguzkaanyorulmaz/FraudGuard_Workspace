@@ -16,10 +16,12 @@ namespace FraudGuard.Domain.DomainObjects.FraudEvaluation
         public required RuleTargetEnum Target { get; init; }
         public required RuleCategoryEnum Category { get; init; }
 
+        /// <summary>
+        /// Kesin/yaptırım kuralı mı. İşaretliyse puanı güven indiriminden muaf tutulur.
+        /// </summary>
+        public bool IsCritical { get; init; }
+
         /// <summary>Analiste gösterilecek tetiklenme gerekçesi.</summary>
         public string? Reason { get; init; }
-
-        /// <summary>Kural dinamik ifade ile mi değerlendirildi, kod tabanlı mı.</summary>
-        public bool IsExpressionBased { get; init; }
     }
 }

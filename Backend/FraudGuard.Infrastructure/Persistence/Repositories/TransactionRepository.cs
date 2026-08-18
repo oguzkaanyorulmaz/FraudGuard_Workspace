@@ -54,6 +54,30 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
             }
         }
 
+        public async Task<List<ITransaction>> GetRecentTransactionsByMerchantAsync(
+            string merchantId, TimeSpan timeWindow)
+        {
+            if (string.IsNullOrWhiteSpace(merchantId))
+                return new List<ITransaction>();
+
+            var cutoffTime = DateTime.Now.Subtract(timeWindow);
+
+            // İki tablo ayrı sorgulanır: farklı tiplerdir, EF tarafında birleştirilemezler.
+            var creditTxs = await _context.CreditCardTransactions
+                .AsNoTracking()
+                .Where(t => t.MerchantId == merchantId && t.TransactionDate >= cutoffTime)
+                .ToListAsync();
+
+            var debitTxs = await _context.DebitCardTransactions
+                .AsNoTracking()
+                .Where(t => t.MerchantId == merchantId && t.TransactionDate >= cutoffTime)
+                .ToListAsync();
+
+            return creditTxs.Cast<ITransaction>()
+                .Concat(debitTxs.Cast<ITransaction>())
+                .ToList();
+        }
+
         public async Task<bool> HasAnySuspiciousTransactionAsync(int cardId, bool isCreditCard)
         {
             if (isCreditCard)

@@ -1,9 +1,10 @@
-using FraudGuard.Domain.Common.Constants;
+﻿using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.FraudEvaluation;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Abstractions;
+using FraudGuard.Application.Interfaces;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Interfaces.Repositories;
@@ -13,7 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace FraudGuard.Domain.Services
+namespace FraudGuard.Application.Services
 {
     /// <summary>
     /// Fraud değerlendirmesinin orkestratörü. Motorların sırasını ve veri akışını yönetir,
@@ -28,16 +29,21 @@ namespace FraudGuard.Domain.Services
         private static readonly TimeSpan HistoryWindow = TimeSpan.FromHours(24);
         private static readonly TimeSpan HistoryCacheTtl = TimeSpan.FromMinutes(5);
 
+        /// <summary>Alıcıya gelen transferlerin tarandığı pencere (çoklu gönderici tespiti).</summary>
+        private static readonly TimeSpan ReceiverHistoryWindow = TimeSpan.FromHours(1);
+
         private readonly ITransactionRepository _transactionRepository;
         private readonly ICreditCardRepository _creditCardRepository;
         private readonly IDebitCardRepository _debitCardRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IFraudRuleRepository _fraudRuleRepository;
         private readonly IFraudLogRepository _fraudLogRepository;
+        private readonly IMerchantRepository _merchantRepository;
         private readonly IRuleCombinationRepository _combinationRepository;
         private readonly IDynamicRuleEngine _ruleEngine;
         private readonly ICombinationEngine _combinationEngine;
         private readonly ITrustScoreService _trustScoreService;
+        private readonly IRiskScoringService _riskScoringService;
         private readonly ICacheProvider _cacheProvider;
 
         public FraudEvaluationService(
@@ -47,10 +53,12 @@ namespace FraudGuard.Domain.Services
             ICustomerRepository customerRepository,
             IFraudRuleRepository fraudRuleRepository,
             IFraudLogRepository fraudLogRepository,
+            IMerchantRepository merchantRepository,
             IRuleCombinationRepository combinationRepository,
             IDynamicRuleEngine ruleEngine,
             ICombinationEngine combinationEngine,
             ITrustScoreService trustScoreService,
+            IRiskScoringService riskScoringService,
             ICacheProvider cacheProvider)
         {
             _transactionRepository = transactionRepository;
@@ -59,10 +67,12 @@ namespace FraudGuard.Domain.Services
             _customerRepository = customerRepository;
             _fraudRuleRepository = fraudRuleRepository;
             _fraudLogRepository = fraudLogRepository;
+            _merchantRepository = merchantRepository;
             _combinationRepository = combinationRepository;
             _ruleEngine = ruleEngine;
             _combinationEngine = combinationEngine;
             _trustScoreService = trustScoreService;
+            _riskScoringService = riskScoringService;
             _cacheProvider = cacheProvider;
         }
 
@@ -95,10 +105,31 @@ namespace FraudGuard.Domain.Services
                 }
             }
 
-            TransactionInputEnricher.Enrich(input, history, cardLimit, cardBalance);
+            // İşyeri seçilmeden gönderilen işlemlerde ikisi de null kalır; işyeri bazlı
+            // sayaçlar hesaplanmaz ve onları kullanan kurallar tetiklenmez.
+            var merchant = await _merchantRepository.GetByIdAsync(input.MerchantId ?? string.Empty);
+
+            var merchantHistory = merchant is null
+                ? null
+                : await _transactionRepository.GetRecentTransactionsByMerchantAsync(
+                    merchant.MerchantId, HistoryWindow);
+
+            // Alıcı tarafına ait veri: enricher saf olduğu için repository'ye erişemez,
+            // bu iki girdi burada toplanıp hazır geçilir. Yalnızca transfer işlemlerinde okunur.
+            var (receiverHistory, isReceiverBlocked) = await LoadReceiverContextAsync(input);
+
+            TransactionInputEnricher.Enrich(
+                input, history, cardLimit, cardBalance,
+                evaluatedAt: null,
+                merchant: merchant,
+                merchantHistory: merchantHistory,
+                cardId: cardId,
+                isCreditCard: isCreditCard,
+                receiverHistory: receiverHistory,
+                isReceiverBlocked: isReceiverBlocked);
 
             var activeRules = await _fraudRuleRepository.GetAllActiveRulesAsync();
-            var outcome = await _ruleEngine.EvaluateAsync(input, activeRules, history);
+            var outcome = _ruleEngine.Evaluate(input, activeRules);
 
             if (outcome.Triggered.Count == 0)
                 return FraudDecisionResult.Clean(outcome.Failures);
@@ -109,68 +140,39 @@ namespace FraudGuard.Domain.Services
             var trustContext = await BuildTrustContextAsync(cardId, isCreditCard);
             var trust = _trustScoreService.Evaluate(trustContext);
 
-            return BuildDecision(outcome, appliedCombinations, trust);
+            // Skorlama politikası (eşikler, indirim, havuz ayrımı) Domain'e aittir;
+            // bu servis yalnızca veriyi toplayıp motorların sırasını yönetir.
+            return _riskScoringService.BuildDecision(outcome, appliedCombinations, trust);
         }
 
         // ------------------------------------------------------------------
-        // Skorlama ve karar
+        // Alıcı tarafı verisi
         // ------------------------------------------------------------------
 
-        private static FraudDecisionResult BuildDecision(
-            RuleEvaluationOutcome outcome,
-            IReadOnlyList<AppliedCombination> appliedCombinations,
-            TrustAssessment trust)
+        /// <summary>
+        /// Alıcı hesabına ait fraud sinyallerini toplar.
+        /// <para>
+        /// Enricher saf bir domain servisidir ve repository'ye erişemez; alıcı tarafına bakan
+        /// göstergelerin verisi bu yüzden burada toplanır. Transfer dışı işlemlerde sorgu yapılmaz.
+        /// </para>
+        /// </summary>
+        /// <returns>Alıcıya gelen son 1 saatlik transferler ve alıcı hesabın bloke durumu.</returns>
+        private async Task<(List<ITransaction>? ReceiverHistory, bool IsReceiverBlocked)>
+            LoadReceiverContextAsync(ProcessTransactionInput input)
         {
-            var triggeredRules = outcome.Triggered;
+            bool isTransfer = input.PaymentType is PaymentTypeEnum.EFT or PaymentTypeEnum.BankTransfer;
 
-            int cardRaw = SumScores(triggeredRules, RuleTargetEnum.Card);
-            int merchantRaw = SumScores(triggeredRules, RuleTargetEnum.Merchant);
+            if (!isTransfer || string.IsNullOrWhiteSpace(input.ReceiverIBAN))
+                return (null, false);
 
-            int cardBonus = SumBonuses(appliedCombinations, RuleTargetEnum.Card);
-            int merchantBonus = SumBonuses(appliedCombinations, RuleTargetEnum.Merchant);
+            var incoming = await _transactionRepository
+                .GetRecentTransferTransactionsByReceiverIBANAsync(input.ReceiverIBAN, ReceiverHistoryWindow);
 
-            int cardBeforeTrust = cardRaw + cardBonus;
-            int merchantBeforeTrust = merchantRaw + merchantBonus;
+            // Sistemde bloke edilmiş hesap, kara listenin ta kendisidir.
+            var receiverAccount = await _debitCardRepository.GetByIBANAsync(input.ReceiverIBAN);
 
-            int cardFinal = Math.Min(100, Floor(cardBeforeTrust - trust.CardDiscount));
-            int merchantFinal = Math.Min(100, Floor(merchantBeforeTrust - trust.MerchantDiscount));
-
-            // Fiilen uygulanan indirim: taban sıfır olduğu için tanımlı indirimden düşük olabilir.
-            int appliedDiscount = (cardBeforeTrust - cardFinal) + (merchantBeforeTrust - merchantFinal);
-
-            int decisiveScore = Math.Min(100, Math.Max(cardFinal, merchantFinal));
-
-            return new FraudDecisionResult
-            {
-                Decision = ResolveDecision(decisiveScore),
-                CardRiskScore = cardFinal,
-                MerchantRiskScore = merchantFinal,
-                RawRuleScore = cardRaw + merchantRaw,
-                TotalBonusScore = cardBonus + merchantBonus,
-                TotalTrustDiscount = appliedDiscount,
-                TriggeredRules = triggeredRules,
-                AppliedCombinations = appliedCombinations,
-                TrustFactors = trust.AppliedFactors,
-                Failures = outcome.Failures
-            };
+            return (incoming.Cast<ITransaction>().ToList(), receiverAccount?.IsBlocked ?? false);
         }
-
-        private static RiskDecisionEnum ResolveDecision(int score) => score switch
-        {
-            >= RiskScoringConstants.RetBlokeThreshold => RiskDecisionEnum.RetBloke,
-            >= RiskScoringConstants.EkDogrulamaThreshold => RiskDecisionEnum.EkDogrulama,
-            >= RiskScoringConstants.IzleThreshold => RiskDecisionEnum.Izle,
-            _ => RiskDecisionEnum.Normal
-        };
-
-        private static int SumScores(IReadOnlyList<TriggeredRule> rules, RuleTargetEnum target) =>
-            rules.Where(r => r.Target == target).Sum(r => r.Score);
-
-        private static int SumBonuses(IReadOnlyList<AppliedCombination> combinations, RuleTargetEnum target) =>
-            combinations.Where(c => c.Target == target).Sum(c => c.BonusScore);
-
-        private static int Floor(int score) =>
-            Math.Max(RiskScoringConstants.MinimumRiskScore, score);
 
         // ------------------------------------------------------------------
         // Güven skoru verisinin toplanması

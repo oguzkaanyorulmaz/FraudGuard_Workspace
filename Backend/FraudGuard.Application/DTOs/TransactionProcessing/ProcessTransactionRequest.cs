@@ -17,6 +17,12 @@ namespace FraudGuard.Application.DTOs.TransactionProcessing
         public string Location { get; set; }
         public string Country { get; set; } = "Türkiye";
         public string MerchantCategory { get; set; }
+
+        /// <summary>
+        /// İşlemin geçtiği üye işyeri kodu. Örn: "MRC001".
+        /// Gönderilmezse işyeri bazlı sayaçlar hesaplanmaz.
+        /// </summary>
+        public string? MerchantId { get; set; }
         public int? OriginalTransactionId { get; set; }
         public string? RRN { get; set; }
     }

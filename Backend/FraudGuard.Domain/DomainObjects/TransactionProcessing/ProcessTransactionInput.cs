@@ -163,12 +163,30 @@ namespace FraudGuard.Domain.DomainObjects.TransactionProcessing
 
         // ------------------------------------------------------------------
         // 6. İşyeri bazlı alanlar
-        //    Merchant master verisi (EMerchant) sisteme eklenene kadar doldurulmaz.
+        //    İstekte MerchantId gönderildiğinde EMerchant kaydından ve işyeri
+        //    geçmişinden doldurulur. İşyeri seçilmeyen işlemlerde varsayılan değerlerde kalır.
         // ------------------------------------------------------------------
+
+        /// <summary>İşlemin geçtiği üye işyerinin kodu. İstekten gelir.</summary>
         public string? MerchantId { get; set; }
+
+        /// <summary>İşyerinin MCC kodu (ISO 18245). İşyeri kaydından okunur.</summary>
         public string? MccKodu { get; set; }
+
+        /// <summary>Bu işyerinde son 1 saatte işlem yapan farklı kart sayısı (bu kart dahil).</summary>
         public int FarkliKartSayisi { get; set; }
+
+        /// <summary>Bu kartın son 24 saatte işlem yaptığı farklı işyeri sayısı (bu işyeri dahil).</summary>
         public int FarkliIsyeriSayisi { get; set; }
+
+        /// <summary>İşyerinin POS tahsis tarihi. İşyeri kaydından okunur.</summary>
         public DateTime? PosTahsisTarihi { get; set; }
+
+        /// <summary>
+        /// POS tahsisinden bu yana geçen gün. İşyeri bilinmiyorsa <see cref="int.MaxValue"/>.
+        /// <see cref="PosTahsisTarihi"/> ile aynı bilgiyi taşır ama ifadelerde nullable
+        /// tarih aritmetiği gerektirmediği için kural yazarken tercih edilmelidir.
+        /// </summary>
+        public int IsyeriYasiGun { get; set; } = int.MaxValue;
     }
 }

@@ -1,8 +1,8 @@
-using FraudGuard.Domain.Entities;
+﻿using FraudGuard.Domain.Entities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FraudGuard.Domain.Interfaces.DomainServices
+namespace FraudGuard.Application.Interfaces
 {
     public interface IAdminOperationService
     {

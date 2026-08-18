@@ -100,10 +100,12 @@ namespace FraudGuard.Infrastructure.Persistence.SeedData
                 "Açıklamada bahis, kripto vb. yasaklı kelimelerin bulunması",
                 20, RuleCategoryEnum.Identity),
 
+            // Kesin kural: alıcı hesabın bloke olması deterministik bir yaptırım sinyalidir,
+            // güven geçmişi tarafından bastırılmamalıdır.
             Dynamic(18, "HIGH_RISK_RECEIVER", "Şüpheli Alıcı/Katır Hesap",
                 "input.RiskliAliciMi",
                 "Gönderilen IBAN'ın sistemde kara listede olması",
-                45, RuleCategoryEnum.Identity),
+                45, RuleCategoryEnum.Identity, isCritical: true),
 
             Dynamic(19, "MULTI_SENDER_TO_SINGLE_RECEIVER", "Tek Alıcıya Çoklu Gönderim",
                 "input.Son1SaatFarkliGondericiSayisi >= 3",
@@ -189,22 +191,33 @@ namespace FraudGuard.Infrastructure.Persistence.SeedData
                 30, RuleCategoryEnum.Location),
 
             // ----------------------------------------------------------------
-            // İşyeri bazlı şablonlar
+            // İşyeri bazlı kurallar
+            // Yalnızca istekte MerchantId gönderilen işlemlerde değerlendirilir;
+            // işyeri seçilmemişse sayaçlar varsayılanda kalır ve kural tetiklenmez.
             // ----------------------------------------------------------------
-            MerchantTemplate(36, "MERCHANT_MULTI_CARD_VELOCITY", "İşyerinde 1 Saatte Çoklu Kart Denemesi",
-                "input.FarkliKartSayisi >= 3 || input.AyniKartIslemAdedi >= 3",
-                "Aynı işyerinde 1 saat içinde 3 farklı kart veya aynı kartla 3 işlem denenmesi",
+            MerchantRule(36, "MERCHANT_MULTI_CARD_VELOCITY", "İşyerinde 1 Saatte Çoklu Kart Denemesi",
+                "input.FarkliKartSayisi >= 3",
+                "Aynı işyerinde 1 saat içinde 3 veya daha fazla farklı kartla işlem denenmesi",
                 30, RuleCategoryEnum.Velocity),
 
-            MerchantTemplate(37, "NEW_MERCHANT_HIGH_TURNOVER", "Yeni İşyeri Ani Yüksek Ciro",
-                "input.PosTahsisTarihi != null && input.SonGunIslemHacmi > 200000",
+            MerchantRule(37, "NEW_MERCHANT_HIGH_TURNOVER", "Yeni İşyeri Ani Yüksek Ciro",
+                "input.IsyeriYasiGun <= 30 && input.SonGunIslemHacmi > 200000",
                 "POS tahsisinden sonraki 30 gün içinde 24 saatlik cironun 200.000 TL'yi aşması",
-                35, RuleCategoryEnum.Amount)
+                35, RuleCategoryEnum.Amount),
+
+            MerchantRule(38, "MERCHANT_CARD_SPRAY", "Kartın Çok Sayıda İşyerine Yayılması",
+                "input.FarkliIsyeriSayisi >= 5",
+                "Aynı kartın son 24 saatte 5 veya daha fazla farklı işyerinde kullanılması",
+                25, RuleCategoryEnum.Velocity)
         ];
 
+        /// <param name="isCritical">
+        /// Deterministik yaptırım kuralları için true. Bu kuralların puanı güven indiriminden
+        /// muaf tutulur; sezgisel kurallarda kullanılmamalıdır.
+        /// </param>
         private static EFraudRule Dynamic(
             int id, string code, string name, string expression, string description,
-            int score, RuleCategoryEnum category) =>
+            int score, RuleCategoryEnum category, bool isCritical = false) =>
             new()
             {
                 RuleId = id,
@@ -215,10 +228,15 @@ namespace FraudGuard.Infrastructure.Persistence.SeedData
                 Score = score,
                 Target = RuleTargetEnum.Card,
                 Category = category,
+                IsCritical = isCritical,
                 IsActive = true
             };
 
-        private static EFraudRule MerchantTemplate(
+        /// <summary>
+        /// İşyeri bazlı kural. Puanı kart havuzuna değil işyeri havuzuna yazılır.
+        /// EMerchant verisi eklendiğinden beri bu kurallar aktif çalışır.
+        /// </summary>
+        private static EFraudRule MerchantRule(
             int id, string code, string name, string expression, string description,
             int score, RuleCategoryEnum category) =>
             new()
@@ -231,7 +249,7 @@ namespace FraudGuard.Infrastructure.Persistence.SeedData
                 Score = score,
                 Target = RuleTargetEnum.Merchant,
                 Category = category,
-                IsActive = false
+                IsActive = true
             };
     }
 }

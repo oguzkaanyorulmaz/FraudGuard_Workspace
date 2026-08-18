@@ -19,7 +19,109 @@
         <div class="orb orb-3"></div>
     </div>
 
-    <div class="container">
+    <!-- ══════════ Giriş Ekranı ══════════ -->
+    <div class="login-screen" id="loginScreen">
+        <header class="login-topbar">
+            <div class="login-brand">
+                <span class="login-brand-mark">FG</span>
+                <span class="login-brand-name">FraudGuard</span>
+            </div>
+        </header>
+
+        <main class="login-main">
+            <div class="login-wrap">
+                <h1 class="login-greeting">Hoş Geldiniz</h1>
+
+                <div class="login-card">
+                    <div class="login-tabs">
+                        <button type="button" class="login-tab active" id="loginTabSignIn">GİRİŞ YAP</button>
+                        <button type="button" class="login-tab" id="loginTabSignUp">KAYIT OL</button>
+                    </div>
+
+                    <div class="login-body">
+                        <div class="login-alert error hidden" id="loginError"></div>
+                        <div class="login-alert success hidden" id="loginSuccess"></div>
+
+                        <!-- Giriş Formu -->
+                        <form id="signInForm" class="login-form">
+                            <div class="login-field">
+                                <label for="loginUsername">Kullanıcı Adı</label>
+                                <div class="login-input-wrap">
+                                    <input type="text" id="loginUsername" placeholder="Kullanıcı adınızı giriniz"
+                                        autocapitalize="none" autocorrect="off" autocomplete="username" required>
+                                    <span class="login-input-icon">👤</span>
+                                </div>
+                            </div>
+                            <div class="login-field">
+                                <label for="loginPassword">Şifreniz</label>
+                                <div class="login-input-wrap">
+                                    <input type="password" id="loginPassword" placeholder="Şifrenizi giriniz"
+                                        autocomplete="current-password" required>
+                                    <span class="login-input-icon">🔑</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="login-submit" id="signInBtn">GİRİŞ YAP</button>
+                        </form>
+
+                        <!-- Kayıt Formu -->
+                        <form id="signUpForm" class="login-form hidden">
+                            <div class="login-field">
+                                <label for="regUsername">Kullanıcı Adı</label>
+                                <div class="login-input-wrap">
+                                    <input type="text" id="regUsername" placeholder="Kullanıcı adı girin"
+                                        autocapitalize="none" autocorrect="off" required>
+                                </div>
+                            </div>
+                            <div class="login-field">
+                                <label for="regMail">E-Posta</label>
+                                <div class="login-input-wrap">
+                                    <input type="email" id="regMail" placeholder="ornek@mail.com" autocapitalize="none"
+                                        autocorrect="off" required>
+                                </div>
+                            </div>
+                            <div class="login-field">
+                                <label for="regPassword">Şifre</label>
+                                <div class="login-input-wrap">
+                                    <input type="password" id="regPassword" placeholder="••••••••" required>
+                                </div>
+                            </div>
+                            <div class="login-field">
+                                <label for="regRole">Yetki Rolü</label>
+                                <div class="login-input-wrap">
+                                    <select id="regRole">
+                                        <option value="3">Analist (Rol 3)</option>
+                                        <option value="2">Karar Mekanizması (Rol 2)</option>
+                                        <option value="1">Sistem Yöneticisi / Admin (Rol 1)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="login-submit" id="signUpBtn">KAYIT OL</button>
+                        </form>
+                    </div>
+                </div>
+
+                <p class="login-hint">
+                    Kural yönetimi için <strong>Admin</strong> yetkili bir hesapla giriş yapın.
+                </p>
+            </div>
+        </main>
+
+        <footer class="login-footer">
+            <div class="login-footer-card">
+                <div class="login-footer-icon">🛡️</div>
+                <div class="login-footer-text">
+                    <h3>Güvenlik &amp; Proje Bilgilendirmesi</h3>
+                    <p>
+                        Bu ekran <strong>FraudGuard İşlem Simülatörü</strong>'ne aittir. Simülatör, backend fraud
+                        motoruna gerçek işlem istekleri gönderir ve kural kataloğunu doğrudan değiştirir.
+                        Yapılan her değişiklik canlı kural motorunu bir sonraki işlemden itibaren etkiler.
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <div class="container hidden" id="appShell">
         <!-- Header -->
         <header class="header">
             <div class="logo">
@@ -34,12 +136,53 @@
                     <span>İşlem Simülatörü</span>
                 </div>
             </div>
-            <div class="status-indicator" id="statusIndicator">
-                <span class="status-dot"></span>
-                <span class="status-text">Backend Bekleniyor...</span>
+            <div class="header-right">
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Backend Bekleniyor...</span>
+                </div>
+                <div class="user-chip" id="userChip">
+                    <span class="user-avatar" id="userAvatar">A</span>
+                    <span class="user-meta">
+                        <span class="user-name" id="userName">—</span>
+                        <span class="user-role" id="userRole">—</span>
+                    </span>
+                    <button class="logout-btn" id="logoutBtn" title="Çıkış Yap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
         </header>
 
+        <!-- Sayfa Geçişi -->
+        <nav class="page-nav">
+            <button class="page-nav-btn active" data-page="transactions" id="navTransactions">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                    <line x1="1" y1="10" x2="23" y2="10" />
+                </svg>
+                Harcamalar
+            </button>
+            <button class="page-nav-btn" data-page="rules" id="navRules">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                Kural Yönetimi
+            </button>
+        </nav>
+
+        <!-- ══════════ Sayfa 1: Harcamalar ══════════ -->
+        <section class="page" id="pageTransactions">
         <!-- Main Layout Wrapper -->
         <div class="main-layout">
             <!-- Left Column: Form & Response -->
@@ -200,6 +343,21 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="form-grid cols-1" id="merchantGroup">
+                            <div class="form-group">
+                                <label for="merchantId">
+                                    Üye İşyeri
+                                    <span class="label-hint">işyeri bazlı kurallar için gerekli</span>
+                                </label>
+                                <div class="select-wrapper">
+                                    <select id="merchantId">
+                                        <option value="">— İşyeri seçilmedi —</option>
+                                    </select>
+                                </div>
+                                <div class="merchant-meta hidden" id="merchantMeta"></div>
+                            </div>
+                        </div>
+
                         <div class="form-grid cols-3">
                             <div class="form-group">
                                 <label for="merchantCategory">İşyeri Kategorisi</label>
@@ -460,7 +618,199 @@
                 </div>
             </div> <!-- Closes right-column -->
         </div> <!-- Closes main-layout -->
+        </section> <!-- Closes pageTransactions -->
+
+        <!-- ══════════ Sayfa 2: Kural Yönetimi ══════════ -->
+        <section class="page hidden" id="pageRules">
+            <div class="main-layout rules-layout">
+                <!-- Sol: Yeni kural formu -->
+                <div class="left-column">
+                    <form class="form-card glass-card" id="ruleForm">
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                                Yeni Kural
+                            </h2>
+
+                            <div class="form-grid cols-3">
+                                <div class="form-group">
+                                    <label for="ruleCode">Kural Kodu</label>
+                                    <div class="input-wrapper">
+                                        <input type="text" id="ruleCode" placeholder="HIGH_AMOUNT" maxlength="50"
+                                            required>
+                                    </div>
+                                </div>
+                                <div class="form-group span-2">
+                                    <label for="ruleName">Kural Adı</label>
+                                    <div class="input-wrapper">
+                                        <input type="text" id="ruleName" placeholder="Yüksek Tutarlı İşlem"
+                                            maxlength="100" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-grid cols-1">
+                                <div class="form-group">
+                                    <label for="ruleDescription">Açıklama</label>
+                                    <div class="input-wrapper">
+                                        <input type="text" id="ruleDescription" placeholder="Kuralın ne yaptığı"
+                                            maxlength="250">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-grid cols-1">
+                                <div class="form-group">
+                                    <label for="ruleExpression">
+                                        İfade
+                                        <span class="label-hint">bool dönmeli · parametre adı <code>input</code></span>
+                                    </label>
+                                    <textarea id="ruleExpression" class="expression-input" rows="3"
+                                        placeholder="input.Amount &gt; 10000" required></textarea>
+                                    <div class="expression-actions">
+                                        <button type="button" class="ghost-btn" id="validateExprBtn">
+                                            İfadeyi Doğrula
+                                        </button>
+                                        <span class="expression-result hidden" id="expressionResult"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-grid cols-3">
+                                <div class="form-group">
+                                    <label for="ruleScore">Ceza Puanı</label>
+                                    <div class="input-wrapper">
+                                        <input type="number" id="ruleScore" placeholder="35" min="1" max="100"
+                                            value="35" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="ruleTarget">Hedef</label>
+                                    <div class="select-wrapper">
+                                        <select id="ruleTarget">
+                                            <option value="Card">💳 Kart</option>
+                                            <option value="Merchant">🏪 İşyeri</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="ruleCategory">Kategori</label>
+                                    <div class="select-wrapper">
+                                        <select id="ruleCategory">
+                                            <option value="Velocity">⚡ Velocity</option>
+                                            <option value="Amount">💰 Amount</option>
+                                            <option value="Time">🕐 Time</option>
+                                            <option value="Identity">🪪 Identity</option>
+                                            <option value="Location">📍 Location</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <label class="switch-row">
+                                <input type="checkbox" id="ruleIsActive" checked>
+                                <span class="switch-track"><span class="switch-thumb"></span></span>
+                                <span class="switch-label">Eklendiğinde aktif olsun</span>
+                            </label>
+
+                            <label class="switch-row">
+                                <input type="checkbox" id="ruleIsCritical">
+                                <span class="switch-track"><span class="switch-thumb"></span></span>
+                                <span class="switch-label">
+                                    Kesin kural — puanı güven indiriminden muaf
+                                    <small>Yalnızca deterministik yaptırım sinyalleri için; sezgisel
+                                        kurallarda işaretleme.</small>
+                                </span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="submit-btn" id="ruleSubmitBtn">
+                            <span class="btn-text">Kuralı Ekle</span>
+                            <span class="btn-loader">
+                                <svg class="spinner" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3"
+                                        stroke-dasharray="40 60" />
+                                </svg>
+                            </span>
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                        </button>
+                    </form>
+
+                    <!-- Kullanılabilir alanlar -->
+                    <div class="history-section fields-panel">
+                        <div class="history-header">
+                            <h2>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="16" x2="12" y2="12" />
+                                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                                </svg>
+                                Kullanılabilir Alanlar
+                            </h2>
+                            <button class="clear-history-btn" id="toggleFields" type="button">Göster</button>
+                        </div>
+                        <div class="fields-body hidden" id="fieldsBody">
+                            <div class="fields-search">
+                                <input type="text" id="fieldSearch" placeholder="Alan ara…">
+                            </div>
+                            <div class="fields-list" id="fieldsList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sağ: Kural kataloğu -->
+                <div class="right-column">
+                    <div class="history-section">
+                        <div class="history-header">
+                            <h2>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                </svg>
+                                Kural Kataloğu
+                                <span class="rule-count" id="ruleCount">0</span>
+                            </h2>
+                            <button class="clear-history-btn" id="refreshRules" type="button" title="Yenile">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                </svg>
+                                Yenile
+                            </button>
+                        </div>
+
+                        <div class="history-filter-tabs">
+                            <button class="history-filter-btn active" data-rule-filter="all" type="button">
+                                📋 Tümü
+                            </button>
+                            <button class="history-filter-btn" data-rule-filter="active" type="button">
+                                ✅ Aktif
+                            </button>
+                            <button class="history-filter-btn" data-rule-filter="passive" type="button">
+                                ⏸️ Pasif
+                            </button>
+                        </div>
+
+                        <div class="fields-search rules-search">
+                            <input type="text" id="ruleSearch" placeholder="Kod, ad veya ifadede ara…">
+                        </div>
+
+                        <div class="rules-list" id="rulesList"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div> <!-- Closes container -->
+
+    <!-- Bildirim -->
+    <div class="toast-stack" id="toastStack"></div>
 
     <script src="app.js"></script>
     <script>

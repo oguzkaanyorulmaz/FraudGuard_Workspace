@@ -63,5 +63,27 @@ namespace FraudGuard.API.Controllers
             var response = await _ruleManagementAppService.CreateRuleAsync(request);
             return response.IsSuccess ? Ok(response) : BadRequest(response);
         }
+
+        /// <summary>
+        /// Kuralı kalıcı olarak siler. Kural geçmiş fraud alarmlarına bağlıysa silinmez;
+        /// bu durumda yalnızca pasife alınabilir.
+        /// </summary>
+        [HttpDelete("rules/{ruleId:int}")]
+        public async Task<IActionResult> DeleteRule(int ruleId)
+        {
+            var response = await _ruleManagementAppService.DeleteRuleAsync(ruleId);
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// Kuralı silmeden devre dışı bırakır veya geri açar.
+        /// Silinemeyen kuralları etkisiz hale getirmenin yolu budur.
+        /// </summary>
+        [HttpPatch("rules/{ruleId:int}/status")]
+        public async Task<IActionResult> SetRuleStatus(int ruleId, [FromBody] SetRuleStatusRequest request)
+        {
+            var response = await _ruleManagementAppService.SetRuleStatusAsync(ruleId, request);
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
+        }
     }
 }

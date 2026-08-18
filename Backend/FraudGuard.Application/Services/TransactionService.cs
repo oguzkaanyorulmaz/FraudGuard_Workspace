@@ -1,15 +1,16 @@
-using FraudGuard.Domain.Common.Constants;
+﻿using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.FraudEvaluation;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Abstractions;
+using FraudGuard.Application.Interfaces;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Repositories;
 using System;
 using System.Threading.Tasks;
 
-namespace FraudGuard.Domain.Services
+namespace FraudGuard.Application.Services
 {
     public class TransactionService : ITransactionService
     {
@@ -167,8 +168,10 @@ namespace FraudGuard.Domain.Services
                     // RET kararı: tutar aktarılmaz, gönderen hesap fraud gerekçesiyle bloke edilir.
                     await BlockCardForFraudAsync(null, senderDebit);
                 }
-                else if (isSuspicious)
+                else if (evaluationResult.Decision != RiskDecisionEnum.Normal)
                 {
+                    // İZLE / EK_DOĞRULAMA: tutar gönderenden düşülür ancak alıcıya geçmez,
+                    // inceleme sonuçlanana kadar bekletilir.
                     senderDebit.Balance -= processedAmount;
                     await _debitCardRepository.UpdateAsync(senderDebit);
                 }
@@ -554,6 +557,7 @@ namespace FraudGuard.Domain.Services
                         Location = input.Location,
                         Country = input.Country,
                         MerchantCategory = input.MerchantCategory,
+                        MerchantId = input.MerchantId,
                         Status = result.Status,
                         DeclineReason = result.Status == "Suspicious" ? $"Fraud: {triggeredRuleCode}" : result.DeclineReason,
                         FraudReason = capturedFraudReason,
@@ -580,6 +584,7 @@ namespace FraudGuard.Domain.Services
                         Location = input.Location,
                         Country = input.Country,
                         MerchantCategory = input.MerchantCategory,
+                        MerchantId = input.MerchantId,
                         Status = result.Status,
                         DeclineReason = result.Status == "Suspicious" ? $"Fraud: {triggeredRuleCode}" : result.DeclineReason,
                         FraudReason = capturedFraudReason,

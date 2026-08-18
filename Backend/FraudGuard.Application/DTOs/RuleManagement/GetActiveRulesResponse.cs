@@ -16,6 +16,9 @@ namespace FraudGuard.Application.DTOs.RuleManagement
         public int Score { get; set; }
         public string Target { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
+        /// <summary>Puanı güven indiriminden muaf mı.</summary>
+        public bool IsCritical { get; set; }
+
         public bool IsActive { get; set; }
     }
 }

@@ -25,6 +25,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
         public DbSet<ERuleCombination> RuleCombinations { get; set; }
         public DbSet<EFraudLog> FraudLogs { get; set; }
         public DbSet<EBlockReason> BlockReasons { get; set; }
+        public DbSet<EMerchant> Merchants { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -51,6 +52,11 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
 
             modelBuilder.Entity<ERuleCombination>().HasData(
                 FraudGuard.Infrastructure.Persistence.SeedData.RuleCombinationSeedData.GetCombinations());
+
+            // 2.5. Merchant Seeding
+            // İşyeri bazlı sayaçlar (farklı kart sayısı, POS yaşı) bu master veriye dayanır.
+            modelBuilder.Entity<EMerchant>().HasData(
+                FraudGuard.Infrastructure.Persistence.SeedData.MerchantSeedData.GetMerchants());
 
             // 3. Block Reasons Seeding
             modelBuilder.Entity<EBlockReason>().HasData(

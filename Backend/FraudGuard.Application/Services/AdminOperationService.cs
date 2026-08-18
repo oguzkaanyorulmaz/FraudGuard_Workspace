@@ -1,11 +1,12 @@
-using FraudGuard.Domain.Entities;
+﻿using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Abstractions;
+using FraudGuard.Application.Interfaces;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Repositories;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FraudGuard.Domain.Services
+namespace FraudGuard.Application.Services
 {
     public class AdminOperationService : IAdminOperationService
     {

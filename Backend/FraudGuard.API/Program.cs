@@ -1,12 +1,10 @@
 using FraudGuard.API.Middleware;
-using FraudGuard.API.Extensions;
 using FraudGuard.Infrastructure.Cache;
 using FraudGuard.Infrastructure.Persistence.Contexts;
 using FraudGuard.Infrastructure.Persistence.Repositories;
 using FraudGuard.Domain.Interfaces.Repositories;
 using FraudGuard.Domain.Interfaces.DomainServices;
 using FraudGuard.Domain.Interfaces.Abstractions;
-using FraudGuard.Domain.Services;
 using FraudGuard.Domain.Services.RuleEngine;
 using FraudGuard.Infrastructure.RuleEngine;
 using FraudGuard.Infrastructure.Diagnostics;
@@ -41,6 +39,7 @@ builder.Services.AddScoped<IBankAccountBeneficiaryRepository, BankAccountBenefic
 builder.Services.AddScoped<IUnitOfWork, FraudGuard.Infrastructure.Persistence.UnitOfWork>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IRuleCombinationRepository, RuleCombinationRepository>();
+builder.Services.AddScoped<IMerchantRepository, MerchantRepository>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IFraudEvaluationService, FraudEvaluationService>();
 
@@ -52,10 +51,12 @@ builder.Services.AddSingleton<IRuleDiagnostics, RuleDiagnostics>();
 // Kombinasyon ve güven servisleri durumsuzdur.
 builder.Services.AddSingleton<ICombinationEngine, CombinationEngine>();
 builder.Services.AddSingleton<ITrustScoreService, TrustScoreService>();
-// Motor, scoped olan kod tabanlı IFraudRule örneklerini aldığı için scoped'dır.
+
+// Saf hesaplama servisleri durumsuzdur; singleton olmaları güvenlidir.
+builder.Services.AddSingleton<IRiskScoringService, RiskScoringService>();
+// Motor durumsuzdur: derlenmiş ifadeleri çalıştırır, veriye erişmez.
 builder.Services.AddScoped<IDynamicRuleEngine, DynamicRuleEngine>();
 
-builder.Services.AddFraudRules();
 builder.Services.AddScoped<IAdminOperationService, AdminOperationService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICacheProvider, MemoryCacheProvider>();
@@ -63,6 +64,7 @@ builder.Services.AddHttpClient<ICurrencyService, TcmbCurrencyService>();
 builder.Services.AddScoped<ITransactionAppService, TransactionAppService>();
 builder.Services.AddScoped<IFraudManagementAppService, FraudManagementAppService>();
 builder.Services.AddScoped<IRuleManagementAppService, RuleManagementAppService>();
+builder.Services.AddScoped<IMerchantAppService, MerchantAppService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<ICryptService, CryptService>();
 builder.Services.AddSingleton<IJwtService, JwtService>();
@@ -150,6 +152,13 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules
 
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'Category')
     ALTER TABLE FraudRules ADD Category INT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'IsCritical')
+BEGIN
+    ALTER TABLE FraudRules ADD IsCritical BIT NOT NULL DEFAULT 0;
+    -- Deterministik yaptırım kuralları güven indiriminden muaf tutulur.
+    EXEC('UPDATE FraudRules SET IsCritical = 1 WHERE RuleCode = ''HIGH_RISK_RECEIVER''');
+END
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RuleCombinations')
 BEGIN

@@ -1,6 +1,6 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
-namespace FraudGuard.Domain.Interfaces.DomainServices
+namespace FraudGuard.Domain.Interfaces.Abstractions
 {
     public interface ICurrencyService
     {

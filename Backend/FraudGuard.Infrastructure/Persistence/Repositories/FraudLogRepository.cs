@@ -35,6 +35,11 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
             await _context.FraudLogs.AddAsync(log);
         }
 
+        public async Task<bool> AnyByRuleIdAsync(int ruleId)
+        {
+            return await _context.FraudLogs.AnyAsync(f => f.RuleId == ruleId);
+        }
+
         public async Task<int> CountRecentAlarmsForCardAsync(int cardId, bool isCreditCard, System.DateTime since)
         {
             if (isCreditCard)

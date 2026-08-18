@@ -28,15 +28,30 @@ Nihai skor: `(kural puanları + kombinasyon bonusu) − güven indirimi`, en az 
 
 ---
 
-## 2. Kural ekleme — üç yol
+## 2. Kural ekleme — dört yol
 
-### A. API ile (önerilen)
+### A. Arayüzden (en pratik)
+
+`http://localhost:4000` → **Kural Yönetimi** sekmesi. Form ifadeyi kaydetmeden doğrular,
+kullanılabilir alanları listeler, kuralı ekler; listeden aktif/pasif yapıp silebilirsin.
+
+### B. API ile
+
+`RuleManagement` uçları **token ister**. Önce giriş yap:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:5217/api/Auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+```
 
 Kaydetmeden önce ifadeyi doğrula:
 
 ```bash
 curl -X POST http://localhost:5217/api/RuleManagement/validate-expression \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"expression":"input.AyniKartIslemAdedi >= 3"}'
 ```
 
@@ -45,6 +60,7 @@ Geçerliyse kuralı oluştur:
 ```bash
 curl -X POST http://localhost:5217/api/RuleManagement/rules \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "ruleCode": "S13",
     "ruleName": "Kural adı",
@@ -53,28 +69,43 @@ curl -X POST http://localhost:5217/api/RuleManagement/rules \
     "score": 30,
     "target": "Card",
     "category": "Velocity",
+    "isCritical": false,
     "isActive": true
   }'
 ```
+
+Kuralı pasife almak veya silmek:
+
+```bash
+curl -X PATCH http://localhost:5217/api/RuleManagement/rules/{ruleId}/status \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"isActive":false}'
+
+curl -X DELETE http://localhost:5217/api/RuleManagement/rules/{ruleId} \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+> Kurala bağlı fraud alarmı varsa silme reddedilir — geçmiş alarmları koparmamak için.
+> Bu durumda kuralı pasife al.
 
 Kural **bir sonraki işlemden itibaren** aktiftir. Motor kural listesini önbelleğe almaz,
 yeniden başlatma gerekmez.
 
 Geçersiz ifade kaydedilmez — API `400` ve derleyici hatasını döner.
 
-### B. Doğrudan SQL ile
+### C. Doğrudan SQL ile
 
 ```sql
-INSERT INTO FraudRules (RuleCode, RuleName, Description, Expression, Score, Target, Category, IsActive)
-VALUES ('S13', 'Kural adı', 'Açıklama', 'input.AyniKartIslemAdedi >= 3', 30, 1, 1, 1);
+INSERT INTO FraudRules (RuleCode, RuleName, Description, Expression, Score, Target, Category, IsCritical, IsActive)
+VALUES ('S13', 'Kural adı', 'Açıklama', 'input.AyniKartIslemAdedi >= 3', 30, 1, 1, 0, 1);
 ```
 
 `RuleId` identity kolonudur, elle verme. `Target`: 1=Card, 2=Merchant.
 `Category`: 1=Velocity, 2=Amount, 3=Time, 4=Identity, 5=Location.
 
-> Bu yol ifadeyi doğrulamaz. Yanlış yazarsan kural sessizce atlanır — API yolunu tercih et.
+> Bu yol ifadeyi doğrulamaz. Yanlış yazarsan kural sessizce atlanır — arayüzü veya API'yi tercih et.
 
-### C. Seed'e ekleyerek (kalıcı)
+### D. Seed'e ekleyerek (kalıcı)
 
 `Backend/FraudGuard.Infrastructure/Persistence/SeedData/FraudRuleSeedData.cs`:
 
@@ -92,6 +123,9 @@ docker compose down -v && docker compose up -d --build
 ```
 
 Kalıcı kural seti için doğru yer burasıdır. Günlük deneme için A yolunu kullan.
+
+İki yardımcı var: `Dynamic(...)` kart havuzuna yazar ve son parametresi `isCritical`'dır
+(varsayılan `false`); `MerchantRule(...)` işyeri havuzuna yazar.
 
 ---
 
@@ -143,12 +177,30 @@ curl http://localhost:5217/api/RuleManagement/available-fields
 | `OrtalamaIslemTutari` | decimal | Son 24 saatteki ortalama (geçmiş yoksa 0) |
 | `SonIslemdenGecenDakika` | int | Geçmiş yoksa `int.MaxValue` |
 
-### ⚠️ Dolmayan alanlar
-Aşağıdakiler modelde tanımlıdır ama çalışma anında **boştur**. Bunları kullanan kural hiç tetiklenmez:
+### İşyeri alanları
+| Alan | Tip | Açıklama |
+|---|---|---|
+| `MerchantId` | string | İşyeri kodu, istekten gelir. Örn: `"MRC015"` |
+| `MccKodu` | string | İşyerinin MCC'si (ISO 18245). Örn: `"5732"` |
+| `PosTahsisTarihi` | DateTime? | POS'un tahsis edildiği tarih |
+| `IsyeriYasiGun` | int | POS tahsisinden bu yana geçen gün. İşyeri yoksa `int.MaxValue` |
+| `FarkliKartSayisi` | int | **Bu işyerinde** son 1 saatte işlem yapan farklı kart (bu kart dahil) |
+| `FarkliIsyeriSayisi` | int | **Bu kartın** son 24 saatte kullanıldığı farklı işyeri (bu işyeri dahil) |
 
-`MerchantId` · `MccKodu` · `FarkliKartSayisi` · `FarkliIsyeriSayisi` · `PosTahsisTarihi`
+> Bu alanlar yalnızca istekte **`merchantId` gönderilmişse** dolar. Gönderilmezse
+> `MerchantId`/`MccKodu` null, sayaçlar 0, `IsyeriYasiGun` ise `int.MaxValue` kalır —
+> bu alanları kullanan kural o işlemde tetiklenmez. Simülatörde "Üye İşyeri" seçicisi bunu yönetir.
 
-Bunlar işyeri (merchant) bazlı sayaçlardır; sistemde `Merchant` varlığı oluşturulana kadar doldurulamaz.
+`PosTahsisTarihi` yerine **`IsyeriYasiGun` kullan**: nullable tarih aritmetiği ifadelerde
+zahmetlidir, gün sayısı doğrudan karşılaştırılabilir.
+
+```csharp
+input.IsyeriYasiGun <= 30 && input.SonGunIslemHacmi > 200000   // yeni işyeri, ani ciro
+input.FarkliKartSayisi >= 3                                     // POS'ta kart deneme
+input.FarkliIsyeriSayisi >= 5                                   // kart çok işyerine yayılmış
+```
+
+İşyeri kataloğu: `curl http://localhost:5217/api/Merchant -H "Authorization: Bearer <token>"`
 
 ---
 
@@ -253,6 +305,24 @@ tetiklenip 65 puan yazar. Yeni kural yazarken mevcut kataloğu kontrol et:
 curl http://localhost:5217/api/RuleManagement/all-rules
 ```
 
+### Güven indirimi ve `isCritical`
+
+Temiz geçmişli bir kart, kural puanlarından **indirim** alır: 6 aydan uzun süredir kayıtlı
+(−15), son 90 günde alarm yok (−20), whitelist'te (−40). Bu yüzden 35 puanlık bir kural
+temiz bir kartta tek başına alarm üretmez — nihai skor 0'a düşer.
+
+`isCritical: true` verilen kuralın puanı **indirimden muaftır**; indirim uygulandıktan sonra
+eklenir. Kara listedeki bir hesaba gönderim gibi **deterministik** yaptırım sinyalleri için
+kullanılır — temiz geçmiş böyle bir bulguyu bastırmamalıdır.
+
+```
+normal kural:   (kural puanları + bonus − güven indirimi)
+kesin kural:    (kural puanları + bonus − güven indirimi) + kesin kural puanları
+```
+
+Sezgisel (heuristic) kurallarda **işaretleme**. Her kural kritik olursa güven skoru anlamını
+yitirir ve yanlış pozitifler artar. Seed'de yalnızca `HIGH_RISK_RECEIVER` kritik işaretlidir.
+
 ---
 
 ## 7. Kombinasyon bonusu
@@ -270,8 +340,11 @@ VALUES ('Kart Testi + Cashout', 'S3,S5', 1, 20, 'Kart test edildi, sonra vuruldu
 
 ## 8. Bilinen kısıtlar
 
-- **Güven indirimi kesin kuralları da düşürür.** Whitelist'teki bir kart 40 puan indirim aldığı için
-  çok yüksek puanlı bir kural bile eşiğin altında kalabilir. `IsCritical` benzeri bir muafiyet alanı yok.
 - **Puan yaşlanması (decay) yok.** Puanlar yalnızca o işlem için hesaplanır, zaman içinde birikmez.
-- **İşyeri skoru hesaplanmaz.** `Target = Merchant` kuralları yazılabilir ama sayaçları dolmadığı için
-  pratikte tetiklenmezler.
+- **Dolmayan iki alan var.** `KisaSuredeFarkliKartlaFonlamaSayisi` ve
+  `KatirHesapBakiyeAnormalligiVarMi` enricher tarafından hesaplanmıyor; bunları kullanan kural
+  hiç tetiklenmez. Güncel liste için `available-fields` çıktısındaki `isPopulated` alanına bak.
+- **İşyeri skoru ayrı havuzda tutulur.** `Target = Merchant` kuralları işyeri havuzuna yazar
+  (`merchantRiskScore`). Nihai karar iki havuzun **büyüğüne** göre verilir, toplamına göre değil.
+- **İşyeri güven indirimi uygulanmaz.** İşyerinin kayıt süresi ve alarm geçmişi henüz izlenmediği
+  için `TrustContext`'in işyeri tarafı boş bırakılır; işyeri skoru indirimsiz kalır.

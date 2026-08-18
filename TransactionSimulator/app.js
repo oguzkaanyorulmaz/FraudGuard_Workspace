@@ -97,10 +97,19 @@ function handleTransactionTypeChange() {
 
 function handleChannelTypeChange() {
     const channelVal = parseInt(channelTypeSelect.value, 10);
-    if (channelVal === 3) { // ATM Cihazı
-        merchantCategoryGroup.style.display = 'none';
-    } else {
-        merchantCategoryGroup.style.display = 'block';
+    const isAtm = channelVal === 3;
+
+    merchantCategoryGroup.style.display = isAtm ? 'none' : 'block';
+
+    // ATM işleminin üye işyeri yoktur; seçici gizlenir ve seçim temizlenir.
+    const merchantGroupEl = document.getElementById('merchantGroup');
+    if (merchantGroupEl) {
+        merchantGroupEl.style.display = isAtm ? 'none' : 'block';
+        if (isAtm) {
+            const select = document.getElementById('merchantId');
+            select.value = '';
+            select.dispatchEvent(new Event('change'));
+        }
     }
 }
 
@@ -248,6 +257,10 @@ cardForm.addEventListener('submit', async (e) => {
         merchantCategory: parseInt(document.getElementById('channelTypeId').value, 10) === 3
             ? 'ATM / Nakit'
             : document.getElementById('merchantCategory').value,
+        // Boş bırakılırsa işyeri bazlı sayaçlar hesaplanmaz; backend null bekliyor.
+        merchantId: parseInt(document.getElementById('channelTypeId').value, 10) === 3
+            ? null
+            : (document.getElementById('merchantId').value || null),
         rrn: rrnInput.value || null
     };
 
@@ -487,8 +500,8 @@ function addHistory(data, type, payload) {
 
 function setHistoryFilter(filter) {
     historyFilter = filter;
-    // Update active button
-    document.querySelectorAll('.history-filter-btn').forEach(btn => {
+    // Kural yönetimi sayfası da aynı sınıfı kullanıyor; seçim yalnızca bu sayfada güncellenir.
+    document.querySelectorAll('#pageTransactions .history-filter-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.filter === filter);
     });
     renderHistory();
@@ -543,8 +556,14 @@ function renderHistory() {
         // Response fields
         if (r.transactionId) detailRows += historyDetailRow('İşlem ID', r.transactionId);
         if (r.rrn) detailRows += historyDetailRow('RRN', r.rrn);
+        if (p.merchantId) detailRows += historyDetailRow('Üye İşyeri', p.merchantId);
         if (r.declineReason && item.status !== 'Approved') detailRows += historyDetailRow('Red Sebebi', r.declineReason);
         if (r.fraudReason) detailRows += historyDetailRow('Fraud Nedeni', r.fraudReason);
+
+        // Fraud değerlendirmesi. Onaylanan işlemlerde de gösterilir: bir kural tetiklenip
+        // puanı eşiğin altında kaldığında karar NORMAL olur, ama kural çalışmıştır.
+        detailRows += renderFraudBreakdown(r);
+
         if (r.message) detailRows += historyDetailRow('Mesaj', r.message, true); // 🟢 fullWidth = true
 
         const isExpanded = item.id === expandedHistoryId;
@@ -658,3 +677,770 @@ transferCurrencySelect.addEventListener('change', () => updateCurrencySymbol(tra
 renderHistory();
 checkBackend();
 setInterval(checkBackend, 30000);
+
+/* ============================================
+   Kimlik Doğrulama
+   ============================================ */
+
+const AUTH_STORAGE_KEY = 'fg_sim_auth';
+const RULES_API = '/api/RuleManagement';
+
+// { token, username, role, roleName }
+let auth = null;
+
+const loginScreen = document.getElementById('loginScreen');
+const appShell = document.getElementById('appShell');
+const loginError = document.getElementById('loginError');
+const loginSuccess = document.getElementById('loginSuccess');
+const signInForm = document.getElementById('signInForm');
+const signUpForm = document.getElementById('signUpForm');
+const signInBtn = document.getElementById('signInBtn');
+const signUpBtn = document.getElementById('signUpBtn');
+const loginTabSignIn = document.getElementById('loginTabSignIn');
+const loginTabSignUp = document.getElementById('loginTabSignUp');
+
+function readStoredAuth() {
+    try {
+        const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function persistAuth(value) {
+    auth = value;
+    if (value) {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(value));
+    } else {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+}
+
+function showLoginMessage(el, text) {
+    [loginError, loginSuccess].forEach(node => {
+        node.classList.add('hidden');
+        node.textContent = '';
+    });
+    if (el && text) {
+        el.textContent = text;
+        el.classList.remove('hidden');
+    }
+}
+
+function setLoginMode(mode) {
+    const isSignIn = mode === 'signin';
+    loginTabSignIn.classList.toggle('active', isSignIn);
+    loginTabSignUp.classList.toggle('active', !isSignIn);
+    signInForm.classList.toggle('hidden', !isSignIn);
+    signUpForm.classList.toggle('hidden', isSignIn);
+    showLoginMessage(null);
+}
+
+loginTabSignIn.addEventListener('click', () => setLoginMode('signin'));
+loginTabSignUp.addEventListener('click', () => setLoginMode('signup'));
+
+function enterApp() {
+    loginScreen.classList.add('hidden');
+    appShell.classList.remove('hidden');
+
+    document.getElementById('userName').textContent = auth.username;
+    document.getElementById('userRole').textContent = auth.roleName || '—';
+    document.getElementById('userAvatar').textContent = (auth.username || '?').charAt(0);
+
+    checkBackend();
+    loadRules();
+    loadFields();
+    loadMerchants();
+}
+
+function exitApp(message) {
+    persistAuth(null);
+    appShell.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    setLoginMode('signin');
+    document.getElementById('loginPassword').value = '';
+    if (message) showLoginMessage(loginError, message);
+}
+
+// ─── Giriş ───
+signInForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    showLoginMessage(null);
+    signInBtn.disabled = true;
+    signInBtn.textContent = 'GİRİŞ YAPILIYOR...';
+
+    try {
+        const res = await fetch('/api/Auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: document.getElementById('loginUsername').value.trim(),
+                password: document.getElementById('loginPassword').value
+            })
+        });
+
+        const body = await res.json();
+
+        if (!res.ok || !body.isSuccess) {
+            showLoginMessage(loginError, firstError(body) || 'Kullanıcı adı veya şifre hatalı.');
+            return;
+        }
+
+        persistAuth({
+            token: body.data.token,
+            username: body.data.username,
+            role: body.data.role,
+            roleName: body.data.roleName
+        });
+        enterApp();
+    } catch (err) {
+        showLoginMessage(loginError, `Backend'e ulaşılamadı: ${err.message}`);
+    } finally {
+        signInBtn.disabled = false;
+        signInBtn.textContent = 'GİRİŞ YAP';
+    }
+});
+
+// ─── Kayıt ───
+signUpForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    showLoginMessage(null);
+    signUpBtn.disabled = true;
+    signUpBtn.textContent = 'KAYIT YAPILIYOR...';
+
+    try {
+        const res = await fetch('/api/Auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: document.getElementById('regUsername').value.trim(),
+                mail: document.getElementById('regMail').value.trim(),
+                password: document.getElementById('regPassword').value,
+                role: parseInt(document.getElementById('regRole').value, 10)
+            })
+        });
+
+        const body = await res.json();
+
+        if (!res.ok || !body.isSuccess) {
+            showLoginMessage(loginError, firstError(body) || 'Kayıt başarısız. Kullanıcı adı alınmış olabilir.');
+            return;
+        }
+
+        setLoginMode('signin');
+        showLoginMessage(loginSuccess, 'Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+        document.getElementById('loginUsername').value = document.getElementById('regUsername').value.trim();
+        document.getElementById('regPassword').value = '';
+    } catch (err) {
+        showLoginMessage(loginError, `Backend'e ulaşılamadı: ${err.message}`);
+    } finally {
+        signUpBtn.disabled = false;
+        signUpBtn.textContent = 'KAYIT OL';
+    }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => exitApp());
+
+/**
+ * ResponseDTO<T> hata mesajını çıkarır. Middleware düz metin döndürdüğünde
+ * gövde JSON olmayabilir; o durumda çağıran taraf kendi mesajını verir.
+ */
+function firstError(body) {
+    if (!body) return null;
+    if (Array.isArray(body.errors) && body.errors.length > 0) return body.errors[0];
+    return body.message || null;
+}
+
+/**
+ * Token'lı istek. 401 dönerse oturum düşmüştür; kullanıcı giriş ekranına alınır.
+ */
+async function authFetch(url, options = {}) {
+    const res = await fetch(url, {
+        ...options,
+        headers: {
+            ...(options.headers || {}),
+            'Authorization': `Bearer ${auth?.token || ''}`
+        }
+    });
+
+    if (res.status === 401) {
+        exitApp('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.');
+        throw new Error('unauthorized');
+    }
+
+    return res;
+}
+
+/* ============================================
+   Sayfa Geçişi
+   ============================================ */
+
+const pages = {
+    transactions: document.getElementById('pageTransactions'),
+    rules: document.getElementById('pageRules')
+};
+
+document.querySelectorAll('.page-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchPage(btn.dataset.page));
+});
+
+function switchPage(name) {
+    document.querySelectorAll('.page-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.page === name);
+    });
+    Object.entries(pages).forEach(([key, el]) => {
+        el.classList.toggle('hidden', key !== name);
+    });
+
+    // Kural listesi başka bir sekmeden değişmiş olabilir; sayfaya her girişte tazelenir.
+    if (name === 'rules') loadRules();
+}
+
+/* ============================================
+   Bildirim
+   ============================================ */
+
+const toastStack = document.getElementById('toastStack');
+
+function toast(message, kind = 'ok', duration = 5000) {
+    const el = document.createElement('div');
+    el.className = `toast ${kind}`;
+    el.innerHTML = `
+        <span class="toast-icon">${kind === 'ok' ? '✅' : '⚠️'}</span>
+        <span>${escapeHtml(message)}</span>
+    `;
+    toastStack.appendChild(el);
+    setTimeout(() => el.remove(), duration);
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/* ============================================
+   Kural Yönetimi
+   ============================================ */
+
+const ruleForm = document.getElementById('ruleForm');
+const ruleSubmitBtn = document.getElementById('ruleSubmitBtn');
+const rulesList = document.getElementById('rulesList');
+const ruleCountBadge = document.getElementById('ruleCount');
+const ruleSearchInput = document.getElementById('ruleSearch');
+const expressionInput = document.getElementById('ruleExpression');
+const expressionResult = document.getElementById('expressionResult');
+const validateExprBtn = document.getElementById('validateExprBtn');
+
+let rules = [];
+let ruleFilter = 'all';
+let ruleSearch = '';
+
+// ─── Katalog ───
+async function loadRules() {
+    if (!auth) return;
+
+    try {
+        const res = await authFetch(`${RULES_API}/all-rules`);
+        const body = await res.json();
+
+        if (!body.isSuccess) {
+            toast(firstError(body) || 'Kural listesi alınamadı.', 'bad');
+            return;
+        }
+
+        rules = body.data || [];
+        renderRules();
+    } catch (err) {
+        if (err.message !== 'unauthorized') {
+            toast(`Kural listesi alınamadı: ${err.message}`, 'bad');
+        }
+    }
+}
+
+function renderRules() {
+    const term = ruleSearch.trim().toLowerCase();
+
+    const filtered = rules.filter(rule => {
+        if (ruleFilter === 'active' && !rule.isActive) return false;
+        if (ruleFilter === 'passive' && rule.isActive) return false;
+        if (!term) return true;
+        return [rule.ruleCode, rule.ruleName, rule.expression, rule.description]
+            .some(field => (field || '').toLowerCase().includes(term));
+    });
+
+    ruleCountBadge.textContent = filtered.length;
+
+    if (filtered.length === 0) {
+        rulesList.innerHTML = `<div class="empty-history">${term ? 'Aramayla eşleşen kural yok' : 'Kural bulunamadı'}</div>`;
+        return;
+    }
+
+    rulesList.innerHTML = filtered.map(rule => `
+        <div class="rule-item ${rule.isActive ? '' : 'passive'}">
+            <div class="rule-top">
+                <span class="rule-code">${escapeHtml(rule.ruleCode)}</span>
+                <span class="rule-score">${rule.score}P</span>
+                <span class="rule-tag">${escapeHtml(rule.target)}</span>
+                <span class="rule-tag">${escapeHtml(rule.category)}</span>
+                ${rule.isCritical
+            ? '<span class="rule-tag critical" title="Puanı güven indiriminden muaf">KESİN</span>'
+            : ''}
+                <div class="rule-actions">
+                    <label class="switch-row" title="${rule.isActive ? 'Pasife al' : 'Aktifleştir'}">
+                        <input type="checkbox" data-action="toggle" data-id="${rule.ruleId}"
+                            ${rule.isActive ? 'checked' : ''}>
+                        <span class="switch-track"><span class="switch-thumb"></span></span>
+                    </label>
+                    <button class="icon-btn danger" data-action="delete" data-id="${rule.ruleId}"
+                        data-code="${escapeHtml(rule.ruleCode)}" title="Kuralı sil">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="rule-name">${escapeHtml(rule.ruleName)}</div>
+            <div class="rule-expression">${escapeHtml(rule.expression || '— ifade yok —')}</div>
+        </div>
+    `).join('');
+}
+
+// Liste yeniden çizildiği için olaylar delegasyonla bağlanır.
+rulesList.addEventListener('change', (e) => {
+    const input = e.target.closest('[data-action="toggle"]');
+    if (input) setRuleStatus(parseInt(input.dataset.id, 10), input.checked);
+});
+
+rulesList.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="delete"]');
+    if (btn) deleteRule(parseInt(btn.dataset.id, 10), btn.dataset.code);
+});
+
+document.querySelectorAll('[data-rule-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        ruleFilter = btn.dataset.ruleFilter;
+        document.querySelectorAll('[data-rule-filter]').forEach(b => {
+            b.classList.toggle('active', b === btn);
+        });
+        renderRules();
+    });
+});
+
+ruleSearchInput.addEventListener('input', () => {
+    ruleSearch = ruleSearchInput.value;
+    renderRules();
+});
+
+document.getElementById('refreshRules').addEventListener('click', loadRules);
+
+// ─── Aktif / Pasif ───
+async function setRuleStatus(ruleId, isActive) {
+    try {
+        const res = await authFetch(`${RULES_API}/rules/${ruleId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive })
+        });
+
+        const body = await res.json();
+
+        if (!body.isSuccess) {
+            toast(firstError(body) || 'Durum değiştirilemedi.', 'bad');
+            loadRules(); // anahtar sunucudaki gerçek duruma geri döner
+            return;
+        }
+
+        const rule = rules.find(r => r.ruleId === ruleId);
+        if (rule) rule.isActive = body.data.isActive;
+
+        renderRules();
+        toast(body.message, 'ok');
+    } catch (err) {
+        if (err.message !== 'unauthorized') {
+            toast(`Durum değiştirilemedi: ${err.message}`, 'bad');
+            loadRules();
+        }
+    }
+}
+
+// ─── Silme ───
+async function deleteRule(ruleId, ruleCode) {
+    if (!confirm(`'${ruleCode}' kuralı kalıcı olarak silinecek. Onaylıyor musunuz?`)) return;
+
+    try {
+        const res = await authFetch(`${RULES_API}/rules/${ruleId}`, { method: 'DELETE' });
+        const body = await res.json();
+
+        if (!body.isSuccess) {
+            // En sık sebep: kurala bağlı fraud logu var, FK silmeyi engelliyor.
+            toast(firstError(body) || 'Kural silinemedi.', 'bad', 8000);
+            return;
+        }
+
+        rules = rules.filter(r => r.ruleId !== ruleId);
+        renderRules();
+        toast(body.message, 'ok');
+    } catch (err) {
+        if (err.message !== 'unauthorized') {
+            toast(`Kural silinemedi: ${err.message}`, 'bad');
+        }
+    }
+}
+
+// ─── İfade doğrulama ───
+validateExprBtn.addEventListener('click', () => validateExpression(true));
+
+async function validateExpression(showToast) {
+    const expression = expressionInput.value.trim();
+
+    if (!expression) {
+        setExpressionResult(false, 'İfade boş olamaz.');
+        return false;
+    }
+
+    validateExprBtn.disabled = true;
+
+    try {
+        const res = await authFetch(`${RULES_API}/validate-expression`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ expression })
+        });
+
+        const body = await res.json();
+        const isValid = body.isSuccess && body.data?.isValid;
+
+        setExpressionResult(isValid, isValid ? 'İfade geçerli.' : (body.data?.error || firstError(body)));
+
+        if (showToast && isValid) toast('İfade derlendi, kullanılabilir.', 'ok', 3000);
+        return isValid;
+    } catch (err) {
+        if (err.message !== 'unauthorized') {
+            setExpressionResult(false, err.message);
+        }
+        return false;
+    } finally {
+        validateExprBtn.disabled = false;
+    }
+}
+
+function setExpressionResult(isValid, text) {
+    expressionResult.className = `expression-result ${isValid ? 'ok' : 'bad'}`;
+    expressionResult.textContent = text || '';
+    expressionResult.classList.toggle('hidden', !text);
+}
+
+expressionInput.addEventListener('input', () => {
+    expressionResult.classList.add('hidden');
+});
+
+// ─── Kural ekleme ───
+ruleForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Backend zaten derlemeden kaydetmiyor; burada önden doğrulayıp
+    // kullanıcıya hatayı ifade alanının yanında gösteriyoruz.
+    const isValid = await validateExpression(false);
+    if (!isValid) {
+        toast('İfade derlenemedi, kural kaydedilmedi.', 'bad');
+        return;
+    }
+
+    const payload = {
+        ruleCode: document.getElementById('ruleCode').value.trim(),
+        ruleName: document.getElementById('ruleName').value.trim(),
+        description: document.getElementById('ruleDescription').value.trim() || null,
+        expression: expressionInput.value.trim(),
+        score: parseInt(document.getElementById('ruleScore').value, 10),
+        target: document.getElementById('ruleTarget').value,
+        category: document.getElementById('ruleCategory').value,
+        isCritical: document.getElementById('ruleIsCritical').checked,
+        isActive: document.getElementById('ruleIsActive').checked
+    };
+
+    ruleSubmitBtn.classList.add('loading');
+
+    try {
+        const res = await authFetch(`${RULES_API}/rules`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const body = await res.json();
+
+        if (!body.isSuccess) {
+            toast(firstError(body) || 'Kural eklenemedi.', 'bad', 8000);
+            return;
+        }
+
+        toast(body.data?.message || body.message, 'ok');
+        ruleForm.reset();
+        document.getElementById('ruleScore').value = '35';
+        document.getElementById('ruleIsActive').checked = true;
+        setExpressionResult(true, '');
+        await loadRules();
+    } catch (err) {
+        if (err.message !== 'unauthorized') {
+            toast(`Kural eklenemedi: ${err.message}`, 'bad');
+        }
+    } finally {
+        ruleSubmitBtn.classList.remove('loading');
+    }
+});
+
+/* ============================================
+   Kullanılabilir Alanlar
+   ============================================ */
+
+const fieldsBody = document.getElementById('fieldsBody');
+const fieldsList = document.getElementById('fieldsList');
+const fieldSearchInput = document.getElementById('fieldSearch');
+const toggleFieldsBtn = document.getElementById('toggleFields');
+
+let fields = [];
+let fieldSearch = '';
+
+toggleFieldsBtn.addEventListener('click', () => {
+    const willShow = fieldsBody.classList.contains('hidden');
+    fieldsBody.classList.toggle('hidden', !willShow);
+    toggleFieldsBtn.textContent = willShow ? 'Gizle' : 'Göster';
+});
+
+fieldSearchInput.addEventListener('input', () => {
+    fieldSearch = fieldSearchInput.value;
+    renderFields();
+});
+
+async function loadFields() {
+    if (!auth) return;
+
+    try {
+        const res = await authFetch(`${RULES_API}/available-fields`);
+        const body = await res.json();
+        if (!body.isSuccess) return;
+
+        fields = body.data || [];
+        renderFields();
+    } catch {
+        // Alan listesi yardımcı bilgidir; alınamaması kural yazmayı engellemez.
+    }
+}
+
+function renderFields() {
+    const term = fieldSearch.trim().toLowerCase();
+    const filtered = term
+        ? fields.filter(f => f.name.toLowerCase().includes(term))
+        : fields;
+
+    if (filtered.length === 0) {
+        fieldsList.innerHTML = '<div class="empty-history">Eşleşen alan yok</div>';
+        return;
+    }
+
+    fieldsList.innerHTML = filtered.map(field => `
+        <div class="field-row ${field.isPopulated ? '' : 'unpopulated'}"
+             data-field="${escapeHtml(field.name)}"
+             title="${field.isPopulated ? 'İfadeye eklemek için tıklayın' : escapeHtml(field.note || 'Çalışma anında dolmuyor')}">
+            ${field.isPopulated ? '' : '<span class="field-warn">⚠️</span>'}
+            <span class="field-name">input.${escapeHtml(field.name)}</span>
+            <span class="field-type">${escapeHtml(field.type)}</span>
+        </div>
+    `).join('');
+}
+
+// Alana tıklayınca ifadenin imleç konumuna eklenir.
+fieldsList.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-field]');
+    if (!row) return;
+
+    const snippet = `input.${row.dataset.field}`;
+    const start = expressionInput.selectionStart ?? expressionInput.value.length;
+    const end = expressionInput.selectionEnd ?? expressionInput.value.length;
+
+    expressionInput.value =
+        expressionInput.value.slice(0, start) + snippet + expressionInput.value.slice(end);
+
+    expressionInput.focus();
+    expressionInput.selectionStart = expressionInput.selectionEnd = start + snippet.length;
+    expressionResult.classList.add('hidden');
+});
+
+/* ============================================
+   Açılış
+   ============================================ */
+
+(function bootstrap() {
+    const stored = readStoredAuth();
+
+    if (!stored?.token) {
+        setLoginMode('signin');
+        return;
+    }
+
+    // Saklanan token'ın süresi dolmuş olabilir; authFetch 401'de giriş ekranına döner.
+    auth = stored;
+    enterApp();
+})();
+
+/* ============================================
+   Üye İşyeri Seçimi
+   ============================================ */
+
+const merchantSelect = document.getElementById('merchantId');
+const merchantMeta = document.getElementById('merchantMeta');
+const merchantGroup = document.getElementById('merchantGroup');
+
+let merchants = [];
+
+async function loadMerchants() {
+    if (!auth) return;
+
+    try {
+        const res = await authFetch('/api/Merchant');
+        const body = await res.json();
+        if (!body.isSuccess) return;
+
+        merchants = body.data || [];
+
+        merchantSelect.innerHTML =
+            '<option value="">— İşyeri seçilmedi —</option>' +
+            merchants.map(m =>
+                `<option value="${escapeHtml(m.merchantId)}">${escapeHtml(m.merchantName)} · ${escapeHtml(m.merchantCategory)}</option>`
+            ).join('');
+    } catch {
+        // İşyeri listesi alınamazsa seçici boş kalır; işlem yine de gönderilebilir.
+    }
+}
+
+/**
+ * İşyeri seçilince kategoriyi işyerinin kendi kategorisine sabitler.
+ * İkisinin çelişmesi, kategori bazlı kuralların işyeri verisiyle tutarsız
+ * çalışmasına yol açardı.
+ */
+merchantSelect.addEventListener('change', () => {
+    const merchant = merchants.find(m => m.merchantId === merchantSelect.value);
+
+    if (!merchant) {
+        merchantCategorySelect.disabled = false;
+        merchantMeta.classList.add('hidden');
+        return;
+    }
+
+    const option = [...merchantCategorySelect.options]
+        .find(o => o.value === merchant.merchantCategory);
+
+    if (option) {
+        merchantCategorySelect.value = merchant.merchantCategory;
+    } else {
+        // Seed'de olup kategori listesinde bulunmayan işyerleri (Kripto, Bahis) için
+        // seçenek anında eklenir; aksi halde kategori eski değerinde kalırdı.
+        const created = document.createElement('option');
+        created.value = merchant.merchantCategory;
+        created.textContent = merchant.merchantCategory;
+        merchantCategorySelect.appendChild(created);
+        merchantCategorySelect.value = merchant.merchantCategory;
+    }
+
+    merchantCategorySelect.disabled = true;
+
+    // Sunucudan geliyor: kural motorundaki IsyeriYasiGun ile aynı hesap,
+    // istemcide tekrar hesaplanırsa saat dilimi farkıyla sapabilir.
+    const posAge = merchant.posAgeDays;
+
+    merchantMeta.innerHTML = `
+        <span>MCC <strong>${escapeHtml(merchant.mccCode)}</strong></span>
+        <span>${escapeHtml(merchant.city)}</span>
+        <span>POS yaşı <strong>${posAge} gün</strong>${posAge <= 30 ? ' ⚠️ yeni işyeri' : ''}</span>
+    `;
+    merchantMeta.classList.remove('hidden');
+});
+
+/* ============================================
+   Fraud Skor Kırılımı
+   ============================================ */
+
+const DECISION_LABELS = {
+    NORMAL: { text: 'NORMAL', cls: 'approved' },
+    IZLE: { text: 'İZLE', cls: 'suspicious' },
+    EK_DOGRULAMA: { text: 'EK DOĞRULAMA', cls: 'suspicious' },
+    RET_BLOKE: { text: 'RET / BLOKE', cls: 'declined' }
+};
+
+/**
+ * Kararın nasıl oluştuğunu gösterir: hangi kurallar tetiklendi, kaç puan yazdılar,
+ * güven indirimi ne kadarını götürdü. Kural yazarken "kuralım çalıştı mı" sorusunun
+ * cevabı burasıdır — tetiklenen bir kural, karar NORMAL kalsa bile listede görünür.
+ */
+function renderFraudBreakdown(r) {
+    if (!r || r.decision === undefined || r.decision === null) return '';
+
+    const triggered = r.triggeredRules || [];
+    const failures = r.ruleFailures || [];
+    const combos = r.appliedCombinations || [];
+    const trust = r.trustFactors || [];
+
+    const decision = DECISION_LABELS[r.decision] || { text: r.decision, cls: 'declined' };
+
+    let html = `
+        <div class="history-detail-item full-width fraud-block">
+            <span class="history-detail-label">Fraud Değerlendirmesi</span>
+            <div class="fraud-summary">
+                <span class="fraud-decision ${decision.cls}">${decision.text}</span>
+                <span class="fraud-score">Skor <strong>${r.riskScore ?? 0}</strong></span>
+            </div>
+            <div class="fraud-math">
+                ham <strong>${r.rawRuleScore ?? 0}</strong>
+                ${combos.length ? ` + bonus <strong>${r.totalBonusScore ?? 0}</strong>` : ''}
+                − güven indirimi <strong>${r.totalTrustDiscount ?? 0}</strong>
+                = <strong>${r.riskScore ?? 0}</strong>
+            </div>
+    `;
+
+    if (triggered.length > 0) {
+        html += `
+            <div class="fraud-rules">
+                ${triggered.map(rule => `
+                    <span class="fraud-rule-badge ${rule.isCritical ? 'critical' : ''}"
+                          title="${escapeHtml(rule.reason || rule.ruleName || '')}${rule.isCritical ? ' — kesin kural, puanı indirimden muaf' : ''}">
+                        ${escapeHtml(rule.ruleCode)}
+                        <em>${rule.score}P</em>
+                        <i>${escapeHtml(rule.target || '')}</i>
+                        ${rule.isCritical ? '<b>KESİN</b>' : ''}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        html += '<div class="fraud-empty">Hiçbir kural tetiklenmedi</div>';
+    }
+
+    if (combos.length > 0) {
+        html += `<div class="fraud-note">Kombinasyon: ${combos
+            .map(c => `${escapeHtml(c.combinationName)} (+${c.bonusScore}P)`).join(', ')}</div>`;
+    }
+
+    if (trust.length > 0) {
+        html += `<div class="fraud-note">${trust.map(t => escapeHtml(t)).join(' · ')}</div>`;
+    }
+
+    // İfadesi çalışma anında patlayan kurallar. Sessizce atlanırlar, burada görünür olmaları şart.
+    if (failures.length > 0) {
+        html += `
+            <div class="fraud-failures">
+                ⚠️ Değerlendirilemeyen kural:
+                ${failures.map(f => `<code>${escapeHtml(f.ruleCode)}</code> — ${escapeHtml(f.error)}`).join('<br>')}
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    return html;
+}

@@ -47,6 +47,12 @@ namespace FraudGuard.Application.DTOs.RuleManagement
         public string Category { get; set; } = "Velocity";
 
         public bool IsActive { get; set; } = true;
+
+        /// <summary>
+        /// Kesin/yaptırım kuralı mı. true ise puanı güven indiriminden muaf tutulur.
+        /// Yalnızca deterministik kurallar için işaretlenmelidir.
+        /// </summary>
+        public bool IsCritical { get; set; }
     }
 
     public class CreateFraudRuleResponse
@@ -54,6 +60,23 @@ namespace FraudGuard.Application.DTOs.RuleManagement
         public int RuleId { get; set; }
         public string RuleCode { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Kuralı silmeden devre dışı bırakmak (veya geri açmak) için kullanılır.
+    /// </summary>
+    public class SetRuleStatusRequest : RequestDTO
+    {
+        public bool IsActive { get; set; }
+    }
+
+    public class RuleMutationResponse
+    {
+        public int RuleId { get; set; }
+        public string RuleCode { get; set; } = string.Empty;
+
+        /// <summary>İşlem sonrası kuralın aktiflik durumu. Silinen kuralda false.</summary>
+        public bool IsActive { get; set; }
     }
 
     /// <summary>

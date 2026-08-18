@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\FraudGuard.Application\FraudGuard.Application.csproj" />
+    <!--
+      Infrastructure yalnızca Domain'deki soyutlamaları gerçekleştirir (repository'ler,
+      IUnitOfWork, ICacheProvider, IRuleExpressionCompiler). Application'a bağımlılığı yoktur;
+      referansı Domain'de tutmak bu yönü derleyici seviyesinde garanti eder.
+    -->
+    <ProjectReference Include="..\FraudGuard.Domain\FraudGuard.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

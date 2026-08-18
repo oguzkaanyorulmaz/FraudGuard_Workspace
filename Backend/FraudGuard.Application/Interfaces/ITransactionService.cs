@@ -1,7 +1,7 @@
-using FraudGuard.Domain.DomainObjects.TransactionProcessing;
+﻿using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using System.Threading.Tasks;
 
-namespace FraudGuard.Domain.Interfaces.DomainServices
+namespace FraudGuard.Application.Interfaces
 {
     public interface ITransactionService
     {

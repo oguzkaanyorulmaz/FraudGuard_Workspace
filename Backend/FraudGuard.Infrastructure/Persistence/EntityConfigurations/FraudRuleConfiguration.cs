@@ -20,6 +20,7 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             builder.Property(f => f.Expression).HasMaxLength(1000);
 
             builder.Property(f => f.Score).IsRequired();
+            builder.Property(f => f.IsCritical).IsRequired().HasDefaultValue(false);
             builder.Property(f => f.Target).IsRequired().HasConversion<int>();
             builder.Property(f => f.Category).IsRequired().HasConversion<int>();
 

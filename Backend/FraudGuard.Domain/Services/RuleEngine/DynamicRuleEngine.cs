@@ -1,57 +1,44 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using FraudGuard.Domain.Common.Enums;
 using FraudGuard.Domain.DomainObjects.FraudEvaluation;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Domain.Interfaces.DomainServices;
-using FraudGuard.Domain.Interfaces.Entities;
-using FraudGuard.Domain.Interfaces.Rules;
 
 namespace FraudGuard.Domain.Services.RuleEngine
 {
     /// <summary>
-    /// Kural motorunun çekirdeği. Aktif kuralların tamamını çalıştırır ve tetiklenenleri toplar.
+    /// Kural motorunun çekirdeği. Aktif kuralların tamamını çalıştırır ve tetiklenenleri toplar;
+    /// ilk eşleşmede durmaz, çünkü karar kümülatif skora göre verilir.
     /// <para>
-    /// İki kural tipini tek hatta birleştirir:
-    /// <list type="bullet">
-    /// <item><b>Dinamik</b> — <c>EFraudRule.Expression</c> derlenip çalıştırılır. Yeni kural eklemek
-    /// için kod yazmak gerekmez, veritabanına satır eklemek yeterlidir.</item>
-    /// <item><b>Kod tabanlı</b> — ifadeye sığmayacak kadar karmaşık kurallar için mevcut
-    /// <see cref="IFraudRule"/> implementasyonları çalıştırılır.</item>
-    /// </list>
-    /// Her iki tip de aynı ceza puanını aynı havuza yazar.
+    /// Her kural bir <c>EFraudRule.Expression</c> ifadesidir; çalışma anında derlenip çalıştırılır.
+    /// Yeni kural eklemek için kod yazmak gerekmez, veritabanına satır eklemek yeterlidir.
+    /// </para>
+    /// <para>
+    /// Motor saf CPU işi yapar: veriye erişmez, giriş olarak zenginleştirilmiş
+    /// <see cref="ProcessTransactionInput"/> alır.
     /// </para>
     /// </summary>
     public class DynamicRuleEngine : IDynamicRuleEngine
     {
         private readonly IRuleExpressionCompiler _compiler;
         private readonly IRuleDiagnostics _diagnostics;
-        private readonly IReadOnlyDictionary<string, IFraudRule> _codeBasedRules;
 
         /// <summary>Yalnızca iade işlemlerinde çalışması gereken kurallar.</summary>
         private static readonly HashSet<string> RefundOnlyRuleCodes =
             new(StringComparer.OrdinalIgnoreCase) { "CONSECUTIVE_REFUNDS", "HIGH_VALUE_REFUND_VOID" };
 
-        public DynamicRuleEngine(
-            IRuleExpressionCompiler compiler,
-            IRuleDiagnostics diagnostics,
-            IEnumerable<IFraudRule>? codeBasedRules = null)
+        public DynamicRuleEngine(IRuleExpressionCompiler compiler, IRuleDiagnostics diagnostics)
         {
             _compiler = compiler;
             _diagnostics = diagnostics;
-            _codeBasedRules = (codeBasedRules ?? Enumerable.Empty<IFraudRule>())
-                .GroupBy(r => r.RuleCode, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         }
 
-        public async Task<RuleEvaluationOutcome> EvaluateAsync(
+        public RuleEvaluationOutcome Evaluate(
             ProcessTransactionInput input,
-            IReadOnlyList<EFraudRule> activeRules,
-            List<ITransaction> history)
+            IReadOnlyList<EFraudRule> activeRules)
         {
             var triggered = new List<TriggeredRule>();
             var failures = new List<RuleFailure>();
@@ -63,10 +50,15 @@ namespace FraudGuard.Domain.Services.RuleEngine
 
                 try
                 {
-                    var evaluated = rule.IsExpressionBased
-                        ? EvaluateExpressionRule(rule, input)
-                        : await EvaluateCodeBasedRuleAsync(rule, input, history);
+                    if (!rule.IsExpressionBased)
+                    {
+                        // İfadesiz kural çalıştırılamaz. Sessizce atlanması, kuralın çalıştığı
+                        // yanılgısına yol açacağı için tanım hatası olarak raporlanır.
+                        throw new InvalidOperationException(
+                            "Kuralın ifadesi tanımlanmamış; ifadesiz kural değerlendirilemez.");
+                    }
 
+                    var evaluated = EvaluateRule(rule, input);
                     if (evaluated is not null)
                         triggered.Add(evaluated);
                 }
@@ -92,7 +84,7 @@ namespace FraudGuard.Domain.Services.RuleEngine
             };
         }
 
-        private TriggeredRule? EvaluateExpressionRule(EFraudRule rule, ProcessTransactionInput input)
+        private TriggeredRule? EvaluateRule(EFraudRule rule, ProcessTransactionInput input)
         {
             var predicate = _compiler.Compile(rule.Expression!);
 
@@ -106,33 +98,8 @@ namespace FraudGuard.Domain.Services.RuleEngine
                 Score = rule.Score,
                 Target = rule.Target,
                 Category = rule.Category,
-                Reason = rule.Description ?? rule.RuleName,
-                IsExpressionBased = true
-            };
-        }
-
-        private async Task<TriggeredRule?> EvaluateCodeBasedRuleAsync(
-            EFraudRule rule,
-            ProcessTransactionInput input,
-            List<ITransaction> history)
-        {
-            if (!_codeBasedRules.TryGetValue(rule.RuleCode, out var implementation))
-                return null;
-
-            var (isSuspicious, reason) = await implementation.EvaluateAsync(input, history);
-
-            if (!isSuspicious)
-                return null;
-
-            return new TriggeredRule
-            {
-                RuleCode = rule.RuleCode,
-                RuleName = rule.RuleName,
-                Score = rule.Score,
-                Target = rule.Target,
-                Category = rule.Category,
-                Reason = reason ?? rule.Description ?? rule.RuleName,
-                IsExpressionBased = false
+                IsCritical = rule.IsCritical,
+                Reason = rule.Description ?? rule.RuleName
             };
         }
 
@@ -147,7 +114,6 @@ namespace FraudGuard.Domain.Services.RuleEngine
             return input.TransactionType switch
             {
                 TransactionTypeEnum.Refund => isRefundRule,
-                TransactionTypeEnum.Sale => !isRefundRule,
                 _ => !isRefundRule
             };
         }
