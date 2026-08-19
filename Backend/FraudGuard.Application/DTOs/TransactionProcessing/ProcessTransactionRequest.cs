@@ -25,5 +25,11 @@ namespace FraudGuard.Application.DTOs.TransactionProcessing
         public string? MerchantId { get; set; }
         public int? OriginalTransactionId { get; set; }
         public string? RRN { get; set; }
+
+        /// <summary>
+        /// Yetkilendirme mesajının ham alanları. Gönderilmezse tüm alanlar null kalır
+        /// ve bu alanları kullanan kurallar tetiklenmez.
+        /// </summary>
+        public AuthMessageFieldsDto? Auth { get; set; }
     }
 }

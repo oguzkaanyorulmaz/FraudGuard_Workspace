@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Common.Constants;
 using FluentValidation;
 using FraudGuard.Application.DTOs.FraudManagement;
 
@@ -11,7 +12,7 @@ namespace FraudGuard.Application.Validations
             
             RuleFor(x => x.AdminAction)
                 .NotEmpty()
-                .Must(action => action == "Approved" || action == "CardBlocked")
+                .Must(action => action == AdminActions.Approved || action == AdminActions.CardBlocked)
                 .WithMessage("Aksiyon sadece 'Approved' veya 'CardBlocked' olabilir.");
         }
     }

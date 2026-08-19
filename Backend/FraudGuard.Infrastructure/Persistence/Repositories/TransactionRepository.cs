@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Entities;
 using FraudGuard.Domain.Interfaces.Repositories;
@@ -84,14 +85,14 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
             {
                 return await _context.CreditCardTransactions.AnyAsync(t => 
                     t.CreditCardId == cardId && 
-                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || 
+                    (t.Status == TransactionStatuses.Suspicious || t.Status == TransactionStatuses.SuspiciousRefund || 
                      (t.FraudLog != null && !t.FraudLog.IsResolved)));
             }
             else
             {
                 return await _context.DebitCardTransactions.AnyAsync(t => 
                     t.DebitCardId == cardId && 
-                    (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || 
+                    (t.Status == TransactionStatuses.Suspicious || t.Status == TransactionStatuses.SuspiciousRefund || 
                      (t.FraudLog != null && !t.FraudLog.IsResolved)));
             }
         }
@@ -132,7 +133,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                     .Include(t => t.TransactionType)
                     .Include(t => t.FraudLog)
                         .ThenInclude(fl => fl.FraudRule)
-                    .Where(t => t.CreditCardId == cardId && t.TransactionDate < beforeDate && (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.FraudLog != null))
+                    .Where(t => t.CreditCardId == cardId && t.TransactionDate < beforeDate && (t.Status == TransactionStatuses.Suspicious || t.Status == TransactionStatuses.SuspiciousRefund || t.FraudLog != null))
                     .OrderByDescending(t => t.TransactionDate)
                     .Take(10)
                     .ToListAsync();
@@ -144,7 +145,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                     .Include(t => t.TransactionType)
                     .Include(t => t.FraudLog)
                         .ThenInclude(fl => fl.FraudRule)
-                    .Where(t => t.DebitCardId == cardId && t.TransactionDate < beforeDate && (t.Status == "Suspicious" || t.Status == "SuspiciousRefund" || t.FraudLog != null))
+                    .Where(t => t.DebitCardId == cardId && t.TransactionDate < beforeDate && (t.Status == TransactionStatuses.Suspicious || t.Status == TransactionStatuses.SuspiciousRefund || t.FraudLog != null))
                     .OrderByDescending(t => t.TransactionDate)
                     .Take(10)
                     .ToListAsync();
@@ -160,7 +161,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                     t.CreditCardId == cardId && 
                     t.RRN == rrn && 
                     t.TransactionTypeId == 2 && // 2: Refund
-                    (t.Status == "Approved" || t.Status == "Suspicious" || t.Status == "SuspiciousRefund"));
+                    (t.Status == TransactionStatuses.Approved || t.Status == TransactionStatuses.Suspicious || t.Status == TransactionStatuses.SuspiciousRefund));
             }
             else
             {
@@ -168,7 +169,7 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
                     t.DebitCardId == cardId && 
                     t.RRN == rrn && 
                     t.TransactionTypeId == 2 && // 2: Refund
-                    (t.Status == "Approved" || t.Status == "Suspicious" || t.Status == "SuspiciousRefund"));
+                    (t.Status == TransactionStatuses.Approved || t.Status == TransactionStatuses.Suspicious || t.Status == TransactionStatuses.SuspiciousRefund));
             }
         }
 
@@ -177,13 +178,13 @@ namespace FraudGuard.Infrastructure.Persistence.Repositories
             if (isCreditCard)
             {
                 var tx = await _context.CreditCardTransactions
-                    .FirstOrDefaultAsync(t => t.CreditCardId == cardId && t.RRN == rrn && t.TransactionTypeId == 1 && t.Status == "Approved");
+                    .FirstOrDefaultAsync(t => t.CreditCardId == cardId && t.RRN == rrn && t.TransactionTypeId == 1 && t.Status == TransactionStatuses.Approved);
                 return tx;
             }
             else
             {
                 var tx = await _context.DebitCardTransactions
-                    .FirstOrDefaultAsync(t => t.DebitCardId == cardId && t.RRN == rrn && t.TransactionTypeId == 1 && t.Status == "Approved");
+                    .FirstOrDefaultAsync(t => t.DebitCardId == cardId && t.RRN == rrn && t.TransactionTypeId == 1 && t.Status == TransactionStatuses.Approved);
                 return tx;
             }
         }

@@ -1,7 +1,9 @@
+using FraudGuard.Domain.Common.Constants;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FraudGuard.Domain.Common.Enums;
+using FraudGuard.Domain.DomainObjects.FraudEvaluation;
 using FraudGuard.Domain.DomainObjects.TransactionProcessing;
 using FraudGuard.Domain.Entities;
 using FraudGuard.Domain.Interfaces.Entities;
@@ -24,6 +26,12 @@ namespace FraudGuard.Domain.Services.RuleEngine
     public static class TransactionInputEnricher
     {
         private const decimal SmallTransactionCeiling = 1000m;
+
+        /// <summary>S51/S53 eşiği: "yüksek tutarlı" sayılan alt sınır.</summary>
+        private const decimal HighValueTransactionFloor = 2500m;
+
+        /// <summary>S25 eşiği: işyeri ölçeğinde "yüksek tutarlı" sayılan alt sınır.</summary>
+        private const decimal MerchantHighValueFloor = 50000m;
         private const int NightStartHour = 22;
         private const int NightEndHour = 6;
 
@@ -46,8 +54,6 @@ namespace FraudGuard.Domain.Services.RuleEngine
         public static readonly IReadOnlyDictionary<string, string> UnpopulatedFields =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["KisaSuredeFarkliKartlaFonlamaSayisi"] =
-                    "Cüzdan fonlama geçmişi izlenmiyor; bu sayaç hesaplanmıyor.",
                 ["KatirHesapBakiyeAnormalligiVarMi"] =
                     "Alıcı hesabın bakiye hareketi izlenmiyor; bu gösterge hesaplanmıyor."
             };
@@ -63,7 +69,8 @@ namespace FraudGuard.Domain.Services.RuleEngine
             int cardId = 0,
             bool isCreditCard = true,
             IReadOnlyList<ITransaction>? receiverHistory = null,
-            bool isReceiverBlocked = false)
+            bool isReceiverBlocked = false,
+            ReferenceDataContext? referenceData = null)
         {
             var now = evaluatedAt ?? DateTime.Now;
 
@@ -77,10 +84,12 @@ namespace FraudGuard.Domain.Services.RuleEngine
             ApplyVelocityCounters(input, window24H, now);
             ApplyRefundCounters(input, window24H, now);
             ApplyDiversityCounters(input, window24H);
+            ApplyRegionalCounters(input, window24H);
             ApplyLimitAndBalance(input, cardLimit, cardBalance);
             ApplySecurityAndPatternIndicators(input, window24H, now);
             ApplyMerchantFields(input, merchant, merchantHistory, window24H, now, cardId, isCreditCard);
             ApplyTransferIndicators(input, window24H, receiverHistory, isReceiverBlocked, now);
+            ApplyReferenceDataIndicators(input, referenceData);
 
             return input;
         }
@@ -156,6 +165,11 @@ namespace FraudGuard.Domain.Services.RuleEngine
                 input.MccKodu = merchant.MccCode;
                 input.PosTahsisTarihi = merchant.PosAssignmentDate;
                 input.IsyeriYasiGun = (int)Math.Max(0, (now - merchant.PosAssignmentDate).TotalDays);
+                input.IsyeriVergiMukellefiMi = merchant.IsTaxpayer;
+                input.IsyeriSehri = merchant.City ?? string.Empty;
+                input.IsyeriYetkiliDogumYili = merchant.OwnerBirthDate?.Year ?? 0;
+                input.IsyeriYurtDisiKartYasakMi = merchant.ForeignCardsBlocked;
+                input.IsyeriPfAltiMi = merchant.IsPaymentFacilitatorSub;
             }
 
             // Kartın gezindiği işyeri çeşitliliği: işyeri kaydı olmasa da kart geçmişinden çıkar.
@@ -184,6 +198,68 @@ namespace FraudGuard.Domain.Services.RuleEngine
                 distinctCards.Add(isCreditCard ? $"C{cardId}" : $"D{cardId}");
 
             input.FarkliKartSayisi = distinctCards.Count;
+
+            ApplyMerchantVolumeCounters(input, merchantHistory, now, cardId, isCreditCard);
+        }
+
+        /// <summary>
+        /// İşyeri geçmişinden hesaplanan hacim, ret ve ilk-kullanım sayaçları.
+        /// <para>
+        /// Kapsam kart değil <b>işyeridir</b>: aynı POS'ta tüm kartların ürettiği hareket.
+        /// Pencere, orkestratörün getirdiği işyeri geçmişi kadardır (24 saat).
+        /// </para>
+        /// </summary>
+        private static void ApplyMerchantVolumeCounters(
+            ProcessTransactionInput input,
+            IReadOnlyList<ITransaction> merchantHistory,
+            DateTime now,
+            int cardId,
+            bool isCreditCard)
+        {
+            // S4: işyerinin 24 saatlik toplam cirosu (bu işlem dahil).
+            input.IsyeriSonGunHacmi = merchantHistory
+                .Where(t => IsApproved(t))
+                .Sum(t => t.Amount) + input.Amount;
+
+            // S7: işyerinde son 1 saatte alınan ret adedi.
+            // Not: kaynak senaryo Kayıp/Çalıntı yanıt kodlarını (41/43) ayırıyor; yanıt kodu
+            // işlem tablolarında saklanmadığı için burada tüm retler sayılır.
+            input.IsyeriSonSaatRetAdedi = merchantHistory.Count(t =>
+                !IsApproved(t) && (now - t.TransactionDate) <= TimeSpan.FromHours(1));
+
+            // S51: işyerinde son 6 saatte 2.500 TL üzeri işlem adedi (bu işlem dahil).
+            input.IsyeriSonAltiSaatYuksekTutarAdedi = merchantHistory.Count(t =>
+                t.Amount >= HighValueTransactionFloor &&
+                (now - t.TransactionDate) <= TimeSpan.FromHours(6))
+                + (input.Amount >= HighValueTransactionFloor ? 1 : 0);
+
+            // S3: işyerinin gece penceresindeki cirosu.
+            input.IsyeriGeceIslemHacmi = merchantHistory
+                .Where(t => IsApproved(t) && IsNight(t.TransactionDate))
+                .Sum(t => t.Amount);
+
+            // S8: işyerinin son işleminden bu yana geçen gün. Uzun sessizlik sonrası
+            // gelen ilk işlem ayrı bir tipolojidir.
+            var lastMerchantTx = merchantHistory
+                .OrderByDescending(t => t.TransactionDate)
+                .FirstOrDefault();
+
+            input.IsyeriSonIslemdenGecenGun = lastMerchantTx is null
+                ? int.MaxValue
+                : (int)Math.Max(0, (now - lastMerchantTx.TransactionDate).TotalDays);
+
+            // S25: işyeri daha önce hiç yüksek tutarlı işlem görmemişse, bugünkü ilk yüksek
+            // tutar dikkat çekicidir. Pencere, orkestratörün getirdiği işyeri geçmişi kadardır.
+            input.IsyeriSon30GunYuksekTutarVarMi = merchantHistory.Any(t =>
+                IsApproved(t) && t.Amount >= MerchantHighValueFloor);
+
+            // S58: bu kart bu işyerinde daha önce hiç kullanılmamışsa ilk kullanımdır.
+            string? currentCardKey = cardId > 0
+                ? (isCreditCard ? $"C{cardId}" : $"D{cardId}")
+                : null;
+
+            input.KartIsyerindeIlkKullanimMi = currentCardKey is not null &&
+                !merchantHistory.Any(t => string.Equals(CardKey(t), currentCardKey, StringComparison.OrdinalIgnoreCase));
         }
 
         private static string? CardKey(ITransaction transaction)
@@ -199,6 +275,11 @@ namespace FraudGuard.Domain.Services.RuleEngine
             input.IslemSaati = now.Hour;
             input.HaftaSonuMu = now.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
             input.GeceIslemiMi = IsNight(now);
+
+            // BIN, kart numarasının ilk 6 hanesidir. Ayrı bir alan taşınmadığı için buradan türetilir.
+            input.BinNo = input.CardNumber is { Length: >= 6 }
+                ? input.CardNumber.Substring(0, 6)
+                : string.Empty;
         }
 
         private static void ApplyVolumeCounters(
@@ -349,6 +430,15 @@ namespace FraudGuard.Domain.Services.RuleEngine
                 .ToList();
 
             input.SonGunAtmNakitYatirmaSayisi = atmDeposits.Count;
+
+            // Kısa sürede üst üste fonlama, katır hesap yükleme örüntüsünün işaretidir.
+            // Kaynak kartı ayırt edemiyoruz (yatırma işlemi kaynak kart bilgisi taşımaz),
+            // bu yüzden ölçülen şey "farklı kart" değil "fonlama sıklığı"dır.
+            // Değerlendirilen işlem de yatırma ise sayılır — diğer hız sayaçlarıyla aynı kural:
+            // "1 saatte 3 yatırma" koşulu, geçmişteki 2 + mevcut işlem ile sağlanır.
+            input.SonSaatFonlamaSayisi =
+                atmDeposits.Count(t => (now - t.TransactionDate) <= TimeSpan.FromHours(1)) +
+                (input.TransactionType == TransactionTypeEnum.Deposit ? 1 : 0);
             input.SonGunAtmNakitYatirmaHacmi = atmDeposits.Sum(t => t.Amount);
             input.GeceNakitYatirmaHacmi = atmDeposits.Where(t => IsNight(t.TransactionDate)).Sum(t => t.Amount);
 
@@ -364,8 +454,79 @@ namespace FraudGuard.Domain.Services.RuleEngine
             }
         }
 
+        /// <summary>
+        /// S13: aynı kartın aynı bölgede (lokasyonda) yaptığı işlemler.
+        /// <para>
+        /// Kaynak senaryo "aynı tutar ya da arttırarak 3. işlem" der; burada bölge olarak
+        /// işlemin <see cref="ProcessTransactionInput.Location"/> alanı kullanılır, çünkü
+        /// modelde ayrı bir bölge/il kodu yoktur.
+        /// </para>
+        /// </summary>
+        private static void ApplyRegionalCounters(
+            ProcessTransactionInput input, IReadOnlyList<ITransaction> window)
+        {
+            if (string.IsNullOrWhiteSpace(input.Location))
+                return;
+
+            var sameRegion = window
+                .Where(t => string.Equals(t.Location, input.Location, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(t => t.TransactionDate)
+                .ToList();
+
+            input.BolgeselAyniKartAdedi = sameRegion.Count + 1;
+
+            // Tutar dizisi azalmıyorsa (sabit ya da artan) örüntü sayılır.
+            decimal previous = decimal.MinValue;
+            bool nonDecreasing = true;
+            foreach (var amount in sameRegion.Select(t => t.Amount).Append(input.Amount))
+            {
+                if (amount < previous) { nonDecreasing = false; break; }
+                previous = amount;
+            }
+
+            input.BolgeselTutarArtanVeyaSabitMi = nonDecreasing;
+        }
+
+        /// <summary>
+        /// BIN tablosu ve operasyonel listelerden türeyen göstergeler.
+        /// <para>
+        /// BIN bulunamazsa alanlar varsayılanda kalır: kartın yurtdışı olduğunu <b>varsaymak</b>
+        /// yanlış pozitif üretir, bilinmiyorsa sessiz kalmak doğrudur.
+        /// </para>
+        /// </summary>
+        private static void ApplyReferenceDataIndicators(
+            ProcessTransactionInput input, ReferenceDataContext? reference)
+        {
+            if (reference is null)
+                return;
+
+            if (!string.IsNullOrEmpty(input.MccKodu))
+            {
+                input.SifresizKapaliMccMi = reference.PinlessBlockedMccs.Contains(input.MccKodu);
+                input.KuyumcuMccMi = reference.JewelryMccs.Contains(input.MccKodu);
+            }
+
+            if (string.IsNullOrEmpty(input.BinNo) ||
+                !reference.BinRanges.TryGetValue(input.BinNo, out var bin))
+            {
+                return;
+            }
+
+            input.KartSemasi = bin.Scheme;
+            input.KartUlkesi = bin.CountryCode;
+            input.YurtDisiKartMi = !string.Equals(bin.CountryCode, "TR", StringComparison.OrdinalIgnoreCase);
+
+            input.RiskliBinMi = bin.IsRisky;
+            input.YasakliBinMi = bin.IsSanctioned;
+            input.ExpediaBinMi = bin.IsExpedia;
+
+            input.RiskliUlkeKartiMi = reference.RiskyCountries.Contains(bin.CountryCode);
+            input.DurdurulanUlkeMi = reference.BlockedCountries.Contains(bin.CountryCode);
+            input.DurdurulanSemaMi = reference.BlockedSchemes.Contains(bin.Scheme);
+        }
+
         private static bool IsApproved(ITransaction transaction) =>
-            string.Equals(transaction.Status, "Approved", StringComparison.OrdinalIgnoreCase);
+            string.Equals(transaction.Status, TransactionStatuses.Approved, StringComparison.OrdinalIgnoreCase);
 
         private static bool IsNight(DateTime moment) =>
             moment.Hour >= NightStartHour || moment.Hour < NightEndHour;

@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Application.DTOs;
 using FraudGuard.Application.DTOs.TransactionProcessing;
 using FraudGuard.Application.Interfaces;
@@ -36,8 +37,8 @@ namespace FraudGuard.Application.Services
 
             string resultMessage = response.Status switch
             {
-                "Declined" => "İşlem reddedildi.",
-                "Suspicious" => "İşlem şüpheli bulunarak incelemeye alındı.",
+                TransactionStatuses.Declined => "İşlem reddedildi.",
+                TransactionStatuses.Suspicious => "İşlem şüpheli bulunarak incelemeye alındı.",
                 _ => "İşlem onaylandı."
             };
 
@@ -59,8 +60,8 @@ namespace FraudGuard.Application.Services
 
             string resultMessage = response.Status switch
             {
-                "Declined" => "Transfer reddedildi.",
-                "Suspicious" => "Transfer şüpheli bulunarak incelemeye alındı.",
+                TransactionStatuses.Declined => "Transfer reddedildi.",
+                TransactionStatuses.Suspicious => "Transfer şüpheli bulunarak incelemeye alındı.",
                 _ => "Transfer başarıyla gerçekleştirildi."
             };
 

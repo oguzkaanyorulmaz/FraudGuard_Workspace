@@ -24,10 +24,10 @@ namespace FraudGuard.Infrastructure.Persistence.SeedData
             [
                 Merchant("MRC001", "Yıldız Market", "5411", "Market", today.AddDays(-1450), "İstanbul"),
                 Merchant("MRC002", "TeknoDünya Elektronik", "5732", "Elektronik", today.AddDays(-980), "Ankara"),
-                Merchant("MRC003", "Moda Sokak Giyim", "5651", "Giyim", today.AddDays(-720), "İzmir"),
-                Merchant("MRC004", "Lezzet Durağı Restoran", "5812", "Restoran", today.AddDays(-610), "İstanbul"),
-                Merchant("MRC005", "Anadolu Akaryakıt", "5541", "Akaryakıt", today.AddDays(-1200), "Konya"),
-                Merchant("MRC006", "Mavi Tur Seyahat", "4722", "Seyahat", today.AddDays(-540), "Antalya"),
+                Merchant("MRC003", "Moda Sokak Giyim", "5651", "Giyim", today.AddDays(-720), "İzmir", foreignCardsBlocked: true),
+                Merchant("MRC004", "Lezzet Durağı Restoran", "5812", "Restoran", today.AddDays(-610), "Gaziantep"),
+                Merchant("MRC005", "Anadolu Akaryakıt", "5541", "Akaryakıt", today.AddDays(-1200), "Konya", ownerBirthYear: 2007),
+                Merchant("MRC006", "Mavi Tur Seyahat", "4722", "Seyahat", today.AddDays(-540), "Antalya", isTaxpayer: false, isPfSub: true),
                 Merchant("MRC007", "Deniz Otel", "7011", "Konaklama", today.AddDays(-830), "Antalya"),
                 Merchant("MRC008", "Özsoy Kuyumculuk", "5944", "Kuyumcu", today.AddDays(-395), "İstanbul"),
                 Merchant("MRC009", "Sağlık Merkezi Poliklinik", "8062", "Sağlık", today.AddDays(-1100), "Bursa"),
@@ -46,7 +46,9 @@ namespace FraudGuard.Infrastructure.Persistence.SeedData
         }
 
         private static EMerchant Merchant(
-            string id, string name, string mcc, string category, DateTime posAssignedAt, string city) =>
+            string id, string name, string mcc, string category, DateTime posAssignedAt, string city,
+            bool isTaxpayer = true, int ownerBirthYear = 1980,
+            bool foreignCardsBlocked = false, bool isPfSub = false) =>
             new()
             {
                 MerchantId = id,
@@ -56,6 +58,10 @@ namespace FraudGuard.Infrastructure.Persistence.SeedData
                 PosAssignmentDate = posAssignedAt,
                 City = city,
                 Country = "Türkiye",
+                IsTaxpayer = isTaxpayer,
+                OwnerBirthDate = new DateTime(ownerBirthYear, 6, 15),
+                ForeignCardsBlocked = foreignCardsBlocked,
+                IsPaymentFacilitatorSub = isPfSub,
                 IsActive = true
             };
     }

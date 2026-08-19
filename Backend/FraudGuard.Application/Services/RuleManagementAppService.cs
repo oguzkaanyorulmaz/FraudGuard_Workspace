@@ -17,6 +17,11 @@ namespace FraudGuard.Application.Services
 {
     public class RuleManagementAppService : IRuleManagementAppService
     {
+        private const string RootGroup = "Temel";
+
+        private const string CallerSuppliedNote =
+            "İstekte auth bloğu gönderilmedikçe null kalır; bu alanı kullanan kural o işlemde tetiklenmez.";
+
         private readonly IFraudRuleRepository _fraudRuleRepository;
         private readonly IFraudLogRepository _fraudLogRepository;
         private readonly IRuleExpressionCompiler _expressionCompiler;
@@ -185,28 +190,70 @@ namespace FraudGuard.Application.Services
                     : $"'{rule.RuleCode}' kuralı pasife alındı, artık değerlendirilmeyecek.");
         }
 
+        /// <summary>
+        /// İfadelerde kullanılabilecek alanların tam listesi.
+        /// <para>
+        /// İç içe nesneler (örn. <c>Auth</c>) tek satır olarak değil, alanları
+        /// <c>Auth.PinExist</c> biçiminde açılarak listelenir; nesnenin kendisi bir ifadede
+        /// doğrudan kullanılamayacağı için satır olarak dönmez.
+        /// </para>
+        /// </summary>
         public ResponseDTO<List<RuleFieldDto>> GetAvailableFields()
         {
-            var fields = typeof(ProcessTransactionInput)
-                .GetProperties()
-                .Where(p => p.CanRead)
-                .Select(p =>
+            var fields = new List<RuleFieldDto>();
+
+            foreach (var property in typeof(ProcessTransactionInput).GetProperties().Where(p => p.CanRead))
+            {
+                if (IsNestedGroup(property.PropertyType))
                 {
-                    bool unpopulated = UnpopulatedFields.TryGetValue(p.Name, out var note);
-                    return new RuleFieldDto
-                    {
-                        Name = p.Name,
-                        Type = FormatTypeName(p.PropertyType),
-                        IsPopulated = !unpopulated,
-                        Note = note
-                    };
-                })
-                .OrderByDescending(f => f.IsPopulated)
-                .ThenBy(f => f.Name)
+                    AppendNestedFields(fields, property);
+                    continue;
+                }
+
+                bool unpopulated = UnpopulatedFields.TryGetValue(property.Name, out var note);
+
+                fields.Add(new RuleFieldDto
+                {
+                    Name = property.Name,
+                    Type = FormatTypeName(property.PropertyType),
+                    Group = RootGroup,
+                    IsPopulated = !unpopulated,
+                    Note = note
+                });
+            }
+
+            var ordered = fields
+                .OrderBy(f => f.Group == RootGroup ? 0 : 1)
+                .ThenByDescending(f => f.IsPopulated)
+                .ThenBy(f => f.Name, StringComparer.Ordinal)
                 .ToList();
 
-            return ResponseDTO<List<RuleFieldDto>>.Success(fields);
+            return ResponseDTO<List<RuleFieldDto>>.Success(ordered);
         }
+
+        private static void AppendNestedFields(List<RuleFieldDto> fields, System.Reflection.PropertyInfo group)
+        {
+            foreach (var nested in group.PropertyType.GetProperties().Where(p => p.CanRead))
+            {
+                fields.Add(new RuleFieldDto
+                {
+                    Name = $"{group.Name}.{nested.Name}",
+                    Type = FormatTypeName(nested.PropertyType),
+                    Group = group.Name,
+                    // Bu alanlar enricher tarafından değil, isteği gönderen tarafından doldurulur.
+                    // Yapısal olarak ölü değiller; bu yüzden IsPopulated = true, açıklama notta.
+                    IsPopulated = true,
+                    Note = CallerSuppliedNote
+                });
+            }
+        }
+
+        /// <summary>
+        /// Alanları ayrı ayrı listelenmesi gereken iç içe nesne mi.
+        /// string ve değer tipleri kendi başına bir alandır, açılmaz.
+        /// </summary>
+        private static bool IsNestedGroup(Type type) =>
+            type.IsClass && type != typeof(string);
 
         private static string FormatTypeName(Type type)
         {

@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Common.Constants;
 using System;
 
 namespace FraudGuard.Domain.Entities
@@ -9,7 +10,7 @@ namespace FraudGuard.Domain.Entities
         public DateTime LogDate { get; set; } = DateTime.Now;
         public bool IsResolved { get; set; } = false;
         public string? AdminAction { get; set; }
-        public string? Status { get; set; } = "Unresolved";
+        public string? Status { get; set; } = FraudLogStatuses.Unresolved;
         public string? ResolvedByAdmin { get; set; }
         public string? AdminNote { get; set; }
         

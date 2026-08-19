@@ -32,6 +32,13 @@ namespace FraudGuard.Application.Services
         /// <summary>Alıcıya gelen transferlerin tarandığı pencere (çoklu gönderici tespiti).</summary>
         private static readonly TimeSpan ReceiverHistoryWindow = TimeSpan.FromHours(1);
 
+        /// <summary>
+        /// İşyeri geçmişinin tarandığı pencere. Kart geçmişinden uzundur: "30 gündür yüksek
+        /// tutarlı işlem yok" ve "N gündür hiç işlem yok" tipolojileri bu genişliği gerektirir.
+        /// Kısa pencereli sayaçlar (1-6-24 saat) aynı listeden süzülerek hesaplanır.
+        /// </summary>
+        private static readonly TimeSpan MerchantHistoryWindow = TimeSpan.FromDays(30);
+
         private readonly ITransactionRepository _transactionRepository;
         private readonly ICreditCardRepository _creditCardRepository;
         private readonly IDebitCardRepository _debitCardRepository;
@@ -39,6 +46,7 @@ namespace FraudGuard.Application.Services
         private readonly IFraudRuleRepository _fraudRuleRepository;
         private readonly IFraudLogRepository _fraudLogRepository;
         private readonly IMerchantRepository _merchantRepository;
+        private readonly IReferenceDataProvider _referenceDataProvider;
         private readonly IRuleCombinationRepository _combinationRepository;
         private readonly IDynamicRuleEngine _ruleEngine;
         private readonly ICombinationEngine _combinationEngine;
@@ -54,6 +62,7 @@ namespace FraudGuard.Application.Services
             IFraudRuleRepository fraudRuleRepository,
             IFraudLogRepository fraudLogRepository,
             IMerchantRepository merchantRepository,
+            IReferenceDataProvider referenceDataProvider,
             IRuleCombinationRepository combinationRepository,
             IDynamicRuleEngine ruleEngine,
             ICombinationEngine combinationEngine,
@@ -68,6 +77,7 @@ namespace FraudGuard.Application.Services
             _fraudRuleRepository = fraudRuleRepository;
             _fraudLogRepository = fraudLogRepository;
             _merchantRepository = merchantRepository;
+            _referenceDataProvider = referenceDataProvider;
             _combinationRepository = combinationRepository;
             _ruleEngine = ruleEngine;
             _combinationEngine = combinationEngine;
@@ -112,11 +122,14 @@ namespace FraudGuard.Application.Services
             var merchantHistory = merchant is null
                 ? null
                 : await _transactionRepository.GetRecentTransactionsByMerchantAsync(
-                    merchant.MerchantId, HistoryWindow);
+                    merchant.MerchantId, MerchantHistoryWindow);
 
             // Alıcı tarafına ait veri: enricher saf olduğu için repository'ye erişemez,
             // bu iki girdi burada toplanıp hazır geçilir. Yalnızca transfer işlemlerinde okunur.
             var (receiverHistory, isReceiverBlocked) = await LoadReceiverContextAsync(input);
+
+            // BIN tablosu ve operasyonel listeler. Enricher saf olduğu için hazır geçilir.
+            var referenceData = await _referenceDataProvider.GetAsync();
 
             TransactionInputEnricher.Enrich(
                 input, history, cardLimit, cardBalance,
@@ -126,7 +139,8 @@ namespace FraudGuard.Application.Services
                 cardId: cardId,
                 isCreditCard: isCreditCard,
                 receiverHistory: receiverHistory,
-                isReceiverBlocked: isReceiverBlocked);
+                isReceiverBlocked: isReceiverBlocked,
+                referenceData: referenceData);
 
             var activeRules = await _fraudRuleRepository.GetAllActiveRulesAsync();
             var outcome = _ruleEngine.Evaluate(input, activeRules);
@@ -365,7 +379,7 @@ namespace FraudGuard.Application.Services
                 RuleId = rule.RuleId,
                 LogDate = DateTime.Now,
                 IsResolved = isAutoBlocked,
-                Status = isAutoBlocked ? "Resolved" : "Unresolved",
+                Status = isAutoBlocked ? FraudLogStatuses.Resolved : FraudLogStatuses.Unresolved,
                 AdminAction = isAutoBlocked ? "BLOCKED" : null,
                 ResolvedByAdmin = isAutoBlocked ? (resolvedBy ?? "Sistem (Otomatik Bloke)") : null,
                 AdminNote = isAutoBlocked ? (adminNote ?? "Sistem tarafından şüpheli ve yüksek riskli bulunup direkt bloke edildi.") : null

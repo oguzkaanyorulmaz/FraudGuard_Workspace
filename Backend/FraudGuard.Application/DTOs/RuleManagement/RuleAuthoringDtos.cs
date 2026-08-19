@@ -84,8 +84,16 @@ namespace FraudGuard.Application.DTOs.RuleManagement
     /// </summary>
     public class RuleFieldDto
     {
+        /// <summary>İfadede kullanılacak tam yol. Örn: "Amount" veya "Auth.PinExist".</summary>
         public string Name { get; set; } = string.Empty;
+
         public string Type { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Alanın ait olduğu küme. Kökteki alanlar için "Temel"; iç içe nesnelerde
+        /// nesnenin adı (örn. "Auth"). Arayüz uzun grupları katlamak için kullanır.
+        /// </summary>
+        public string Group { get; set; } = "Temel";
 
         /// <summary>
         /// Alanın çalışma anında gerçekten doldurulup doldurulmadığı.

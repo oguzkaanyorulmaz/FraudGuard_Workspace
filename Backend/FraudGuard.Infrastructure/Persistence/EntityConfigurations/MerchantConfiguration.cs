@@ -19,6 +19,11 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             builder.Property(m => m.City).HasMaxLength(60);
             builder.Property(m => m.Country).HasMaxLength(60);
 
+            builder.Property(m => m.IsTaxpayer).IsRequired().HasDefaultValue(true);
+            builder.Property(m => m.ForeignCardsBlocked).IsRequired().HasDefaultValue(false);
+            builder.Property(m => m.IsPaymentFacilitatorSub).IsRequired().HasDefaultValue(false);
+            builder.Property(m => m.OwnerBirthDate);
+
             builder.HasIndex(m => m.IsActive);
         }
     }

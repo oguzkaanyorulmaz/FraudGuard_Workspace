@@ -24,3 +24,11 @@ Thumbs.db
 *.log
 *.exe
 *.docx
+
+# Harici projeye ait kaynak şartnameler.
+# Depo public; içlerinde gerçek işyeri adları, eşik değerleri ve BIN/OFAC
+# listeleri var. Yerelde kalırlar, versiyonlanmazlar.
+docs/*.xlsx
+docs/authfinancialapprove.csv
+excel_full_analysis.txt
+excel_summary.json

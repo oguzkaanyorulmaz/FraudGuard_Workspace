@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using System;
+using System.Linq;
 using FraudGuard.API.Hubs;
 using FraudGuard.Infrastructure.Services;
 
@@ -40,6 +41,7 @@ builder.Services.AddScoped<IUnitOfWork, FraudGuard.Infrastructure.Persistence.Un
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IRuleCombinationRepository, RuleCombinationRepository>();
 builder.Services.AddScoped<IMerchantRepository, MerchantRepository>();
+builder.Services.AddScoped<IReferenceDataRepository, ReferenceDataRepository>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IFraudEvaluationService, FraudEvaluationService>();
 
@@ -48,6 +50,9 @@ builder.Services.AddScoped<IFraudEvaluationService, FraudEvaluationService>();
 builder.Services.AddSingleton<IRuleExpressionCompiler, DynamicExpressoRuleCompiler>();
 // Bozuk kurallar sessizce atlanmaz; teşhis kanalı üzerinden loglanır.
 builder.Services.AddSingleton<IRuleDiagnostics, RuleDiagnostics>();
+// Referans verisi (BIN tablosu, operasyonel listeler) süreç belleğinde hazır tutulur;
+// her işlemde veritabanından okunup sözlüğe çevrilmesi gereksiz maliyetti.
+builder.Services.AddSingleton<IReferenceDataProvider, CachedReferenceDataProvider>();
 // Kombinasyon ve güven servisleri durumsuzdur.
 builder.Services.AddSingleton<ICombinationEngine, CombinationEngine>();
 builder.Services.AddSingleton<ITrustScoreService, TrustScoreService>();
@@ -58,8 +63,15 @@ builder.Services.AddSingleton<IRiskScoringService, RiskScoringService>();
 builder.Services.AddScoped<IDynamicRuleEngine, DynamicRuleEngine>();
 
 builder.Services.AddScoped<IAdminOperationService, AdminOperationService>();
-builder.Services.AddMemoryCache();
-builder.Services.AddSingleton<ICacheProvider, MemoryCacheProvider>();
+// Önbellek Redis'te tutulur: süreç dışında olduğu için birden fazla API örneği aynı
+// veriyi görür. Bir kartın bloke edilmesi tüm örneklerde anında geçerli olur; süreç içi
+// bellekte bu, TTL dolana kadar mümkün değildi.
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
+    options.InstanceName = "fraudguard:";
+});
+builder.Services.AddSingleton<ICacheProvider, RedisCacheProvider>();
 builder.Services.AddHttpClient<ICurrencyService, TcmbCurrencyService>();
 builder.Services.AddScoped<ITransactionAppService, TransactionAppService>();
 builder.Services.AddScoped<IFraudManagementAppService, FraudManagementAppService>();
@@ -153,6 +165,31 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'Category')
     ALTER TABLE FraudRules ADD Category INT NOT NULL DEFAULT 0;
 
+-- Gerekçe özeti 250 karaktere sığmıyordu; çok kural tetikleyen işlem kayıt sırasında hata veriyordu.
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CreditCardTransactions'
+           AND COLUMN_NAME = 'FraudReason' AND CHARACTER_MAXIMUM_LENGTH < 500)
+    ALTER TABLE CreditCardTransactions ALTER COLUMN FraudReason NVARCHAR(500) NULL;
+
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'DebitCardTransactions'
+           AND COLUMN_NAME = 'FraudReason' AND CHARACTER_MAXIMUM_LENGTH < 500)
+    ALTER TABLE DebitCardTransactions ALTER COLUMN FraudReason NVARCHAR(500) NULL;
+
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TransferTransactions'
+           AND COLUMN_NAME = 'FraudReason' AND CHARACTER_MAXIMUM_LENGTH < 500)
+    ALTER TABLE TransferTransactions ALTER COLUMN FraudReason NVARCHAR(500) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Merchants') AND name = 'ForeignCardsBlocked')
+    ALTER TABLE Merchants ADD ForeignCardsBlocked BIT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Merchants') AND name = 'IsPaymentFacilitatorSub')
+    ALTER TABLE Merchants ADD IsPaymentFacilitatorSub BIT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Merchants') AND name = 'IsTaxpayer')
+    ALTER TABLE Merchants ADD IsTaxpayer BIT NOT NULL DEFAULT 1;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Merchants') AND name = 'OwnerBirthDate')
+    ALTER TABLE Merchants ADD OwnerBirthDate DATETIME2 NULL;
+
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('FraudRules') AND name = 'IsCritical')
 BEGIN
     ALTER TABLE FraudRules ADD IsCritical BIT NOT NULL DEFAULT 0;
@@ -173,11 +210,148 @@ BEGIN
         IsActive BIT NOT NULL DEFAULT 1
     );
 END
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'BinRanges')
+BEGIN
+    CREATE TABLE BinRanges (
+        BinPrefix NVARCHAR(6) NOT NULL PRIMARY KEY,
+        CountryCode NVARCHAR(2) NOT NULL,
+        Scheme NVARCHAR(30) NOT NULL,
+        BankName NVARCHAR(120) NULL,
+        IsRisky BIT NOT NULL DEFAULT 0,
+        IsSanctioned BIT NOT NULL DEFAULT 0,
+        IsExpedia BIT NOT NULL DEFAULT 0,
+        IsActive BIT NOT NULL DEFAULT 1
+    );
+END
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ReferenceListEntries')
+BEGIN
+    CREATE TABLE ReferenceListEntries (
+        EntryId INT IDENTITY(1,1) PRIMARY KEY,
+        ListType NVARCHAR(40) NOT NULL,
+        Value NVARCHAR(60) NOT NULL,
+        Description NVARCHAR(200) NULL,
+        IsActive BIT NOT NULL DEFAULT 1
+    );
+    CREATE UNIQUE INDEX IX_ReferenceListEntries_ListType_Value
+        ON ReferenceListEntries (ListType, Value);
+END
 ");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Şema senkronizasyonu uyarısı: {ex.Message}");
+            }
+
+            // Kural kataloğu uzlaştırması.
+            // EnsureCreated yalnızca boş veritabanında seed uygular; mevcut bir kuruluma
+            // sonradan eklenen seed kuralları başka türlü hiç ulaşmaz. Burada yalnızca
+            // RuleCode'u bulunmayan kurallar eklenir — mevcut kayıtlara dokunulmaz, böylece
+            // kullanıcının puan/aktiflik değişiklikleri her açılışta geri alınmaz.
+            try
+            {
+                var existingCodes = context.FraudRules
+                    .Select(r => r.RuleCode)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var missingRules = FraudGuard.Infrastructure.Persistence.SeedData.FraudRuleSeedData
+                    .GetRules()
+                    .Where(r => !existingCodes.Contains(r.RuleCode))
+                    .ToList();
+
+                if (missingRules.Count > 0)
+                {
+                    // Kimlik kolonu veritabanınca üretilsin; iş anahtarı RuleCode'dur.
+                    foreach (var rule in missingRules)
+                        rule.RuleId = 0;
+
+                    context.FraudRules.AddRange(missingRules);
+                    context.SaveChanges();
+
+                    Console.WriteLine(
+                        $"Kural kataloğuna {missingRules.Count} yeni kural eklendi: " +
+                        string.Join(", ", missingRules.Select(r => r.RuleCode)));
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Kural uzlaştırma uyarısı: {ex.Message}");
+            }
+
+            // Referans verisi uzlaştırması (BIN tablosu ve operasyonel listeler).
+            // Kural kataloğuyla aynı gerekçe: EnsureCreated bu satırları mevcut bir
+            // veritabanına eklemez. Eksik olan eklenir, var olana dokunulmaz.
+            try
+            {
+                var existingBins = context.BinRanges
+                    .Select(b => b.BinPrefix)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var missingBins = FraudGuard.Infrastructure.Persistence.SeedData.ReferenceDataSeed
+                    .GetBinRanges()
+                    .Where(b => !existingBins.Contains(b.BinPrefix))
+                    .ToList();
+
+                var existingEntries = context.ReferenceListEntries
+                    .Select(e => e.ListType + "|" + e.Value)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var missingEntries = FraudGuard.Infrastructure.Persistence.SeedData.ReferenceDataSeed
+                    .GetListEntries()
+                    .Where(e => !existingEntries.Contains(e.ListType + "|" + e.Value))
+                    .ToList();
+
+                if (missingBins.Count > 0)
+                    context.BinRanges.AddRange(missingBins);
+
+                if (missingEntries.Count > 0)
+                {
+                    foreach (var entry in missingEntries)
+                        entry.EntryId = 0;
+
+                    context.ReferenceListEntries.AddRange(missingEntries);
+                }
+
+                if (missingBins.Count > 0 || missingEntries.Count > 0)
+                {
+                    context.SaveChanges();
+                    Console.WriteLine(
+                        $"Referans verisi eklendi: {missingBins.Count} BIN, {missingEntries.Count} liste kaydı.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Referans verisi uzlaştırma uyarısı: {ex.Message}");
+            }
+
+            // İşyeri uzlaştırması. Yalnızca MerchantId'si bulunmayan işyerleri eklenir;
+            // mevcut kayıtların alanlarına dokunulmaz çünkü işyeri master verisi operasyon
+            // tarafından düzenlenebilir — seed'i her açılışta üzerine yazmak, elle yapılan
+            // düzeltmeleri geri alırdı.
+            try
+            {
+                var existingMerchants = context.Merchants
+                    .Select(m => m.MerchantId)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var missingMerchants = FraudGuard.Infrastructure.Persistence.SeedData.MerchantSeedData
+                    .GetMerchants()
+                    .Where(m => !existingMerchants.Contains(m.MerchantId))
+                    .ToList();
+
+                if (missingMerchants.Count > 0)
+                {
+                    context.Merchants.AddRange(missingMerchants);
+                    context.SaveChanges();
+                    Console.WriteLine(
+                        $"İşyeri kataloğuna {missingMerchants.Count} yeni kayıt eklendi: " +
+                        string.Join(", ", missingMerchants.Select(m => m.MerchantId)));
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"İşyeri uzlaştırma uyarısı: {ex.Message}");
             }
 
             Console.WriteLine("Veritabanı ve tablolar başarıyla oluşturuldu!");

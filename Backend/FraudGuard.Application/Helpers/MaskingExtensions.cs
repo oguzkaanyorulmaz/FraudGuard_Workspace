@@ -23,6 +23,21 @@ namespace FraudGuard.Application.Helpers
         }
 
         /// <summary>
+        /// IBAN maskesi: "TR11 0006 2000 0000 0001 0000 01" → "TR1100************0001"
+        /// <para>
+        /// Kart maskesiyle aynı şey değildir: IBAN'ın ilk 4 hanesi ülke ve kontrol kodudur,
+        /// kurum bilgisi taşımaz; ortadaki hesap numarası gizlenir.
+        /// </para>
+        /// </summary>
+        public static string? MaskIban(this string? iban)
+        {
+            if (string.IsNullOrEmpty(iban) || iban.Length < 10)
+                return iban;
+
+            return iban.Substring(0, 4) + new string('*', iban.Length - 8) + iban.Substring(iban.Length - 4);
+        }
+
+        /// <summary>
         /// "+905555555555" → "+90*****5555"
         /// </summary>
         public static string? MaskPhoneNumber(this string? phone)

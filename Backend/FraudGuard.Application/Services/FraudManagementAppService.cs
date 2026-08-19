@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Application.DTOs;
 using FraudGuard.Application.DTOs.FraudManagement;
 using FraudGuard.Application.Interfaces;
@@ -175,9 +176,9 @@ namespace FraudGuard.Application.Services
                 TransactionDate = t.TransactionDate,
                 MerchantCategory = t.MerchantCategory,
                 Status = t.Status,
-                FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
-                AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
-                ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                FraudSuspicionReason = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                AdminNote = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                ResolvedByAdmin = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
                 DeclineReason = t.DeclineReason,
                 PaymentTypeCode = t.PaymentType.ToString(),
                 SenderIBAN = t.SenderIBAN,
@@ -202,9 +203,9 @@ namespace FraudGuard.Application.Services
                     TransactionDate = t.TransactionDate,
                     MerchantCategory = t.MerchantCategory,
                     Status = t.Status,
-                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
-                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
-                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    FraudSuspicionReason = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    ResolvedByAdmin = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
                     DeclineReason = t.DeclineReason,
                     PaymentTypeCode = t.PaymentType.ToString(),
                     SenderIBAN = t.SenderIBAN,
@@ -227,9 +228,9 @@ namespace FraudGuard.Application.Services
                     TransactionDate = t.TransactionDate,
                     MerchantCategory = t.MerchantCategory,
                     Status = t.Status,
-                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
-                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
-                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    FraudSuspicionReason = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    ResolvedByAdmin = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
                     DeclineReason = t.DeclineReason,
                     PaymentTypeCode = t.PaymentType.ToString(),
                     SenderIBAN = t.SenderIBAN,
@@ -252,9 +253,9 @@ namespace FraudGuard.Application.Services
                     TransactionDate = t.TransactionDate,
                     MerchantCategory = t.MerchantCategory,
                     Status = t.Status,
-                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
-                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
-                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    FraudSuspicionReason = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    ResolvedByAdmin = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
                     DeclineReason = t.DeclineReason,
                     PaymentTypeCode = t.PaymentType.ToString(),
                     SenderIBAN = t.SenderIBAN,
@@ -320,10 +321,10 @@ namespace FraudGuard.Application.Services
                     MerchantCategory = t.MerchantCategory,
                     Status = t.Status,
                     
-                    FraudSuspicionReason = (t.Status == "Approved" && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
-                    AdminNote = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
+                    FraudSuspicionReason = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? (t.FraudLog.FraudRule?.RuleName ?? t.FraudReason) : null,
+                    AdminNote = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.AdminNote : null,
                     
-                    ResolvedByAdmin = (t.Status == "Approved" && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
+                    ResolvedByAdmin = (t.Status == TransactionStatuses.Approved && t.FraudLog != null) ? t.FraudLog.ResolvedByAdmin : null,
                     DeclineReason = t.DeclineReason,
                     PaymentTypeCode = t.PaymentType.ToString(),
                     SenderIBAN = t.SenderIBAN,
@@ -340,8 +341,8 @@ namespace FraudGuard.Application.Services
                 detail.MaskedCardNumber = detail.MaskedCardNumber.MaskCardNumber();
                 detail.IdentityNumber = detail.IdentityNumber.MaskIdentityNumber();
                 detail.PhoneNumber = detail.PhoneNumber.MaskPhoneNumber();
-                if (!string.IsNullOrEmpty(detail.SenderIBAN)) detail.SenderIBAN = detail.SenderIBAN.MaskCardNumber();
-                if (!string.IsNullOrEmpty(detail.ReceiverIBAN)) detail.ReceiverIBAN = detail.ReceiverIBAN.MaskCardNumber();
+                if (!string.IsNullOrEmpty(detail.SenderIBAN)) detail.SenderIBAN = detail.SenderIBAN.MaskIban();
+                if (!string.IsNullOrEmpty(detail.ReceiverIBAN)) detail.ReceiverIBAN = detail.ReceiverIBAN.MaskIban();
             }
 
             return ResponseDTO<GetFraudLogDetailResponse>.Success(detail);

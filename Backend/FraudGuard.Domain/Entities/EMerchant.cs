@@ -34,6 +34,24 @@ namespace FraudGuard.Domain.Entities
         public string City { get; set; } = string.Empty;
         public string Country { get; set; } = "Türkiye";
 
+        /// <summary>
+        /// İşyeri vergi mükellefi mi. Sınır ötesi işlemlerde mükellef olmayan işyerleri
+        /// yaptırıma tabidir (S44).
+        /// </summary>
+        public bool IsTaxpayer { get; set; } = true;
+
+        /// <summary>
+        /// İşyeri yetkilisinin doğum tarihi. Yaşça küçük yetkiliye sahip firmalar
+        /// ayrı bir risk tipolojisidir (S54).
+        /// </summary>
+        public DateTime? OwnerBirthDate { get; set; }
+
+        /// <summary>İşyerine yurtdışı kartlarla işlem yapılması yasak mı (S43).</summary>
+        public bool ForeignCardsBlocked { get; set; }
+
+        /// <summary>Ödeme kolaylaştırıcı altındaki alt üye işyeri mi (S45).</summary>
+        public bool IsPaymentFacilitatorSub { get; set; }
+
         public bool IsActive { get; set; } = true;
     }
 }

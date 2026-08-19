@@ -32,6 +32,8 @@ namespace FraudGuard.Infrastructure.RuleEngine
         {
             _interpreter = new Interpreter(InterpreterOptions.Default);
             _interpreter.Reference(typeof(ProcessTransactionInput));
+            // İç içe erişim (input.Auth.PinExist) için tipin referanslanması şart.
+            _interpreter.Reference(typeof(AuthMessageFields));
 
             // Atama operatörü kapatılır. Açık bırakılırsa "==" yerine "=" yazmak sessiz bir
             // tuzak olur: "input.YabanciUlkeMi = true" ifadesi bool döndüğü için doğrulamadan

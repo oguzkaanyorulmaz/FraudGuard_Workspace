@@ -2,7 +2,7 @@ using AutoMapper;
 using FraudGuard.Application.DTOs.FraudManagement;
 using FraudGuard.Application.DTOs.RuleManagement;
 using FraudGuard.Domain.Entities;
-using FraudGuard.Application.Extensions;
+using FraudGuard.Application.Helpers;
 
 namespace FraudGuard.Application.Mappings
 {

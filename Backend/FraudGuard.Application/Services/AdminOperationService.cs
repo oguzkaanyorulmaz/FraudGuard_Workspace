@@ -1,4 +1,5 @@
 ﻿using FraudGuard.Domain.Entities;
+using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Domain.Interfaces.Abstractions;
 using FraudGuard.Application.Interfaces;
 using FraudGuard.Domain.Interfaces.DomainServices;
@@ -61,7 +62,7 @@ public async Task<bool> ResolveFraudLogAsync(
 
             if (adminAction == "MarkAsSafe" || adminAction == "APPROVE" || adminAction == "Approve" || adminAction == "APPROVED")
             {
-                log.Transaction.Status = "Approved";
+                log.Transaction.Status = TransactionStatuses.Approved;
                 log.Transaction.DeclineReason = null;
 
                 if (log.Transaction.TransactionTypeId == 4 && !string.IsNullOrEmpty(log.Transaction.ReceiverIBAN))
@@ -96,9 +97,9 @@ public async Task<bool> ResolveFraudLogAsync(
             }
             else if (adminAction == "CardBlocked" || adminAction == "MarkAsFraud" || adminAction == "BLOCK")
             {
-                bool isRefundReversal = log.Transaction.Status == "SuspiciousRefund";
+                bool isRefundReversal = log.Transaction.Status == TransactionStatuses.SuspiciousRefund;
 
-                log.Transaction.Status = "Declined";
+                log.Transaction.Status = TransactionStatuses.Declined;
 
                 if (log.Transaction.CreditCardId.HasValue)
                 {
@@ -113,8 +114,7 @@ public async Task<bool> ResolveFraudLogAsync(
                         {
                             creditCard.AvailableLimit = Math.Min(creditCard.AvailableLimit + convertedAmount, creditCard.CardLimit);
                         }
-                        creditCard.IsBlocked = true;
-                        creditCard.BlockReasonId = blockReasonId;
+                        creditCard.Block(blockReasonId);
                         await _creditCardRepository.UpdateAsync(creditCard);
                     }
                 }
@@ -131,8 +131,7 @@ public async Task<bool> ResolveFraudLogAsync(
                         {
                             debitCard.Balance += convertedAmount;
                         }
-                        debitCard.IsBlocked = true;
-                        debitCard.BlockReasonId = blockReasonId;
+                        debitCard.Block(blockReasonId);
                         await _debitCardRepository.UpdateAsync(debitCard);
                     }
                 }
@@ -149,8 +148,7 @@ public async Task<bool> ResolveFraudLogAsync(
                         {
                             debitCard.Balance += convertedAmount;
                         }
-                        debitCard.IsBlocked = true;
-                        debitCard.BlockReasonId = blockReasonId;
+                        debitCard.Block(blockReasonId);
                         await _debitCardRepository.UpdateAsync(debitCard);
                     }
                 }

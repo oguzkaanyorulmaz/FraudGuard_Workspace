@@ -13,7 +13,14 @@ namespace FraudGuard.Application.Mappings
     {
         public TransactionMappingProfile()
         {
-            CreateMap<ProcessTransactionRequest, ProcessTransactionInput>();
+            CreateMap<AuthMessageFieldsDto, AuthMessageFields>();
+
+            // Auth bloğu istekte gönderilmemiş olabilir. Hedefi null bırakmak,
+            // input.Auth.X kullanan her ifadenin NullReference atmasına yol açardı;
+            // bu yüzden yokluğunda boş bir nesneyle eşlenir (tüm alanlar null kalır).
+            CreateMap<ProcessTransactionRequest, ProcessTransactionInput>()
+                .ForMember(d => d.Auth,
+                    o => o.MapFrom(s => s.Auth ?? new AuthMessageFieldsDto()));
             CreateMap<ProcessTransferRequest, ProcessTransactionInput>();
 
             CreateMap<TriggeredRule, TriggeredRuleDto>()

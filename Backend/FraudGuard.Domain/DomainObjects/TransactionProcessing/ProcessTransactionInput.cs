@@ -18,6 +18,111 @@ namespace FraudGuard.Domain.DomainObjects.TransactionProcessing
     /// </summary>
     public class ProcessTransactionInput
     {
+        /// <summary>
+        /// Yetkilendirme mesajının ham alanları (AUTHFINANCIALAPPROVE).
+        /// İfadelerde <c>input.Auth.PinExist == false</c> şeklinde kullanılır.
+        /// <para>
+        /// Kökteki alanlar hesaplanmış/dönüştürülmüş değerlerdir; buradakiler ham gelen veridir.
+        /// Karşılığı kökte varsa (Amount, Location, RRN, MerchantId, MccKodu) kök tercih edilmelidir.
+        /// </para>
+        /// </summary>
+        public AuthMessageFields Auth { get; set; } = new();
+
+        // ------------------------------------------------------------------
+        // İşyeri bazlı hacim/ret sayaçları (işyeri geçmişinden hesaplanır)
+        // ------------------------------------------------------------------
+
+        /// <summary>İşyerinin son 24 saatteki onaylı cirosu (bu işlem dahil).</summary>
+        public decimal IsyeriSonGunHacmi { get; set; }
+
+        /// <summary>
+        /// İşyerinde son 1 saatte alınan ret adedi.
+        /// Kaynak senaryo Kayıp/Çalıntı yanıt kodlarını ayırır; yanıt kodu saklanmadığı için
+        /// burada tüm retler sayılır.
+        /// </summary>
+        public int IsyeriSonSaatRetAdedi { get; set; }
+
+        /// <summary>İşyerinde son 6 saatte 2.500 TL üzeri işlem adedi (bu işlem dahil).</summary>
+        public int IsyeriSonAltiSaatYuksekTutarAdedi { get; set; }
+
+        /// <summary>İşyerinin gece penceresindeki (22:00-06:00) onaylı cirosu.</summary>
+        public decimal IsyeriGeceIslemHacmi { get; set; }
+
+        /// <summary>Bu kart bu işyerinde ilk kez mi kullanılıyor.</summary>
+        public bool KartIsyerindeIlkKullanimMi { get; set; }
+
+        /// <summary>İşyeri vergi mükellefi mi. İşyeri kaydı yoksa true kabul edilir.</summary>
+        public bool IsyeriVergiMukellefiMi { get; set; } = true;
+
+        /// <summary>İşyeri yetkilisinin doğum yılı. Bilinmiyorsa 0.</summary>
+        public int IsyeriYetkiliDogumYili { get; set; }
+
+        /// <summary>İşyerinin bulunduğu şehir. İşyeri kaydı yoksa boş.</summary>
+        public string IsyeriSehri { get; set; } = string.Empty;
+
+        /// <summary>İşyerinin son işleminden bu yana geçen gün. Geçmiş yoksa int.MaxValue.</summary>
+        public int IsyeriSonIslemdenGecenGun { get; set; } = int.MaxValue;
+
+        /// <summary>İşyerinde son 30 günde 50.000 TL ve üzeri onaylı işlem var mı.</summary>
+        public bool IsyeriSon30GunYuksekTutarVarMi { get; set; }
+
+        /// <summary>Kart numarasının ilk 6 hanesi (BIN). Kart yoksa boş.</summary>
+        public string BinNo { get; set; } = string.Empty;
+
+        // ------------------------------------------------------------------
+        // BIN ve referans listelerinden türeyen alanlar
+        // BIN tablosunda karşılığı olmayan kartlarda varsayılan değerlerinde kalır.
+        // ------------------------------------------------------------------
+
+        /// <summary>Kart şeması: TROY / VISA / MASTERCARD / AMEX. Bilinmiyorsa boş.</summary>
+        public string KartSemasi { get; set; } = string.Empty;
+
+        /// <summary>Kartı ihraç eden kurumun ülke kodu (ISO alpha-2). Bilinmiyorsa boş.</summary>
+        public string KartUlkesi { get; set; } = string.Empty;
+
+        /// <summary>Kart yurtdışı ihraçlı mı (ülkesi TR değil ve biliniyor).</summary>
+        public bool YurtDisiKartMi { get; set; }
+
+        /// <summary>BIN kurumun riskli listesinde mi (S41).</summary>
+        public bool RiskliBinMi { get; set; }
+
+        /// <summary>BIN yaptırım listesinde mi (S47).</summary>
+        public bool YasakliBinMi { get; set; }
+
+        /// <summary>BIN aracı kurum grubunda mı (S50).</summary>
+        public bool ExpediaBinMi { get; set; }
+
+        /// <summary>Kart ülkesi riskli ülke listesinde mi (S42).</summary>
+        public bool RiskliUlkeKartiMi { get; set; }
+
+        /// <summary>Kart ülkesi durdurulan ülke listesinde mi (S57).</summary>
+        public bool DurdurulanUlkeMi { get; set; }
+
+        /// <summary>Kart şeması durdurulan şema listesinde mi (S56).</summary>
+        public bool DurdurulanSemaMi { get; set; }
+
+        /// <summary>İşyerinin MCC'si şifresiz işleme kapalı listesinde mi (S49).</summary>
+        public bool SifresizKapaliMccMi { get; set; }
+
+        /// <summary>İşyerinin MCC'si kuyumcu/değerli maden listesinde mi (S46).</summary>
+        public bool KuyumcuMccMi { get; set; }
+
+        /// <summary>İşyerine yurtdışı kartla işlem yasak mı (S43).</summary>
+        public bool IsyeriYurtDisiKartYasakMi { get; set; }
+
+        /// <summary>İşyeri ödeme kolaylaştırıcı altı mı (S45).</summary>
+        public bool IsyeriPfAltiMi { get; set; }
+
+        // ------------------------------------------------------------------
+        // Bölgesel sayaçlar (kart geçmişi + lokasyon)
+        // ------------------------------------------------------------------
+
+        /// <summary>Aynı kartın aynı lokasyonda son 24 saatteki işlem adedi (bu işlem dahil).</summary>
+        public int BolgeselAyniKartAdedi { get; set; }
+
+        /// <summary>Aynı lokasyondaki tutar dizisi azalmıyor mu (sabit ya da artan).</summary>
+        public bool BolgeselTutarArtanVeyaSabitMi { get; set; }
+
         // ------------------------------------------------------------------
         // 1. Ham işlem alanları
         // ------------------------------------------------------------------
@@ -157,7 +262,7 @@ namespace FraudGuard.Domain.DomainObjects.TransactionProcessing
         /// <summary>Cüzdana yükleme yapıldıktan hemen sonra EFT ile çıkış deneniyor mu.</summary>
         public bool CuzdanFonlamaSonrasiNakitCikisVarMi { get; set; }
         /// <summary>Aynı cüzdana kısa sürede farklı kartlarla bakiye yükleme sayısı.</summary>
-        public int KisaSuredeFarkliKartlaFonlamaSayisi { get; set; }
+        public int SonSaatFonlamaSayisi { get; set; }
         /// <summary>Pasif hesaba aniden para gelip hızla çekilme anormalliği var mı.</summary>
         public bool KatirHesapBakiyeAnormalligiVarMi { get; set; }
 

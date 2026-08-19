@@ -1,3 +1,4 @@
+using FraudGuard.Domain.Common.Constants;
 using FraudGuard.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -23,6 +24,8 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
         public DbSet<EUser> Users { get; set; }
         public DbSet<EFraudRule> FraudRules { get; set; }
         public DbSet<ERuleCombination> RuleCombinations { get; set; }
+        public DbSet<EBinRange> BinRanges { get; set; }
+        public DbSet<EReferenceListEntry> ReferenceListEntries { get; set; }
         public DbSet<EFraudLog> FraudLogs { get; set; }
         public DbSet<EBlockReason> BlockReasons { get; set; }
         public DbSet<EMerchant> Merchants { get; set; }
@@ -52,6 +55,12 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
 
             modelBuilder.Entity<ERuleCombination>().HasData(
                 FraudGuard.Infrastructure.Persistence.SeedData.RuleCombinationSeedData.GetCombinations());
+
+            modelBuilder.Entity<EBinRange>().HasData(
+                FraudGuard.Infrastructure.Persistence.SeedData.ReferenceDataSeed.GetBinRanges());
+
+            modelBuilder.Entity<EReferenceListEntry>().HasData(
+                FraudGuard.Infrastructure.Persistence.SeedData.ReferenceDataSeed.GetListEntries());
 
             // 2.5. Merchant Seeding
             // İşyeri bazlı sayaçlar (farklı kart sayısı, POS yaşı) bu master veriye dayanır.
@@ -218,7 +227,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Paris Store",
                     Country = "Fransa",
                     MerchantCategory = "Giyim",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ECreditCardTransaction
                 {
@@ -233,7 +242,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Sanal POS",
                     Country = "Türkiye",
                     MerchantCategory = "Giyim",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ECreditCardTransaction
                 {
@@ -248,7 +257,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Sanal POS",
                     Country = "Türkiye",
                     MerchantCategory = "Giyim",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ECreditCardTransaction
                 {
@@ -263,7 +272,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Sanal POS",
                     Country = "Türkiye",
                     MerchantCategory = "Giyim",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ECreditCardTransaction
                 {
@@ -278,7 +287,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Sanal POS",
                     Country = "Türkiye",
                     MerchantCategory = "Giyim",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ECreditCardTransaction
                 {
@@ -293,7 +302,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Sanal POS",
                     Country = "Türkiye",
                     MerchantCategory = "Giyim",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 }
             );
 
@@ -312,7 +321,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     Location = "Bakiye Yukleme",
                     Country = "Türkiye",
                     MerchantCategory = "Finans",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 }
             );
 
@@ -331,7 +340,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     TransactionDate = baseTime.AddMinutes(-10),
                     Location = "Mobil Bankacilik",
                     Country = "Türkiye",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ETransferTransaction
                 {
@@ -346,7 +355,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     TransactionDate = baseTime.AddMinutes(-8),
                     Location = "Mobil Bankacilik",
                     Country = "Türkiye",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ETransferTransaction
                 {
@@ -361,7 +370,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     TransactionDate = baseTime.AddMinutes(-15),
                     Location = "Mobil Bankacilik",
                     Country = "Türkiye",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ETransferTransaction
                 {
@@ -376,7 +385,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     TransactionDate = baseTime.AddMinutes(-12),
                     Location = "Mobil Bankacilik",
                     Country = "Türkiye",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 },
                 new ETransferTransaction
                 {
@@ -391,7 +400,7 @@ namespace FraudGuard.Infrastructure.Persistence.Contexts
                     TransactionDate = baseTime.AddMinutes(-10),
                     Location = "Mobil Bankacilik",
                     Country = "Türkiye",
-                    Status = "Approved"
+                    Status = TransactionStatuses.Approved
                 }
             );
         }

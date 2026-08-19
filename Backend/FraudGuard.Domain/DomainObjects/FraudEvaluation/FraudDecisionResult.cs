@@ -59,8 +59,19 @@ namespace FraudGuard.Domain.DomainObjects.FraudEvaluation
         public bool ShouldBlock => Decision == RiskDecisionEnum.RetBloke;
 
         /// <summary>
+        /// İşlem kaydındaki gerekçe alanının uzunluk sınırı.
+        /// <para>
+        /// Özet, kural sayısıyla birlikte büyür ve sınırsızdır. Kesilmezse çok kural tetikleyen
+        /// bir işlem veritabanına yazılamaz ve <b>işlemin tamamı hata verir</b> — yani işlem ne
+        /// kadar şüpheliyse o kadar çökme ihtimali doğardı. Tam kural listesi zaten
+        /// <see cref="TriggeredRules"/> içinde ve API yanıtında yer alır; bu alan yalnızca özettir.
+        /// </para>
+        /// </summary>
+        public const int ReasonSummaryMaxLength = 500;
+
+        /// <summary>
         /// Analiste ve işlem kaydına yazılacak özet gerekçe.
-        /// Tetiklenen tüm kuralları puanlarıyla birlikte tek satırda özetler.
+        /// Tetiklenen kuralları puanlarıyla özetler; alan sınırını aşarsa kesilir.
         /// </summary>
         public string BuildReasonSummary()
         {
@@ -82,7 +93,20 @@ namespace FraudGuard.Domain.DomainObjects.FraudEvaluation
             if (TotalTrustDiscount > 0)
                 summary += $" | Güven indirimi: -{TotalTrustDiscount}P";
 
-            return summary;
+            return Truncate(summary, ReasonSummaryMaxLength);
+        }
+
+        /// <summary>
+        /// Metni sınıra kısaltır ve kesildiğini belli eder.
+        /// Kesilme sessiz olmamalı; analist eksik bilgiye baktığını görmeli.
+        /// </summary>
+        private static string Truncate(string value, int maxLength)
+        {
+            const string ellipsis = "…";
+
+            return value.Length <= maxLength
+                ? value
+                : value.Substring(0, maxLength - ellipsis.Length) + ellipsis;
         }
 
         public static FraudDecisionResult Clean() => new();

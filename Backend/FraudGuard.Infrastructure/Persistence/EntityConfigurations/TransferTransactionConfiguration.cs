@@ -21,7 +21,8 @@ namespace FraudGuard.Infrastructure.Persistence.EntityConfigurations
             builder.Property(t => t.Country).HasMaxLength(50).HasDefaultValue("Türkiye");
             builder.Property(t => t.Status).IsRequired().HasMaxLength(20);
             builder.Property(t => t.DeclineReason).HasMaxLength(250);
-            builder.Property(t => t.FraudReason).HasMaxLength(250);
+            // Gerekçe özeti kural sayısıyla büyür; sınır FraudDecisionResult ile aynı tutulur.
+            builder.Property(t => t.FraudReason).HasMaxLength(500);
 
             // Motorun kararı işlemle birlikte saklanır; panel yeniden hesaplamaz.
             builder.Property(t => t.RiskScore).HasDefaultValue(0);
