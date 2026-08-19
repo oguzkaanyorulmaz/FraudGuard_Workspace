@@ -141,23 +141,79 @@ edilebilir.
 
 ---
 
-## Çalıştırma
+## Kurulum
+
+### Gereksinimler
+
+Tek gereksinim **Docker Desktop**'tır (Compose v2 ile). Her şey konteynerde çalışır;
+makinede .NET SDK veya Node kurulu olmasına gerek yoktur.
+
+Şu portlar boşta olmalı: `3000` · `4000` · `5217` · `1433` · `6379`
+
+### Çalıştırma
 
 ```bash
+git clone https://github.com/oguzkaanyorulmaz/FraudGuard_Workspace.git
+cd FraudGuard_Workspace
 docker compose up -d --build
 ```
+
+İlk kurulum imajların derlenmesi nedeniyle birkaç dakika sürer. Backend, SQL Server
+hazır olana kadar bekler (12 deneme × 5 sn), sonra şemayı kurup örnek verileri yükler.
+
+Hazır olduğunu doğrulamak için:
+
+```bash
+curl http://localhost:5217/api/transactions/ping     # pong dönmeli
+docker compose logs backend | grep "başarıyla"
+```
+
+### Adresler
 
 | Servis | Adres |
 |---|---|
 | Analist paneli | http://localhost:3000 |
 | API / Swagger | http://localhost:5217 · `/swagger` |
-| İşlem simülatörü | http://localhost:4000 |
+| İşlem simülatörü + kural yönetimi | http://localhost:4000 |
+| SQL Server | `localhost,1433` — kullanıcı `sa` |
+| Redis | `localhost:6379` — anahtar öneki `fraudguard:` |
 
 Örnek kullanıcılar: `admin` / `admin123` · `karar` / `karar123` · `analist` / `analist123`
 
-Veritabanı ilk açılışta kurulur ve örnek verilerle doldurulur. Şema değişiklikleri
-açılışta uygulanır; kural kataloğu, referans verisi ve işyerleri **yalnızca eksik
-kayıtlar eklenerek** uzlaştırılır — mevcut veriye dokunulmaz.
+### İlk deneme
+
+Simülatörden (`localhost:4000`) aynı kartla arka arkaya birkaç işlem gönderin; üçüncüde
+hız kuralları tetiklenir ve analist panelinde alarm belirir. Kural Yönetimi sekmesinden
+kendi kuralınızı yazıp aynı anda devreye alabilirsiniz.
+
+### Servisleri yönetmek
+
+```bash
+docker compose logs -f backend        # canlı log
+docker compose up -d --build backend  # yalnızca backend'i yeniden derle
+docker compose down                   # durdur (veri korunur)
+docker compose down -v                # durdur ve veritabanını sıfırla
+```
+
+Veritabanı `mssql-data` adlı kalıcı bir birimde tutulur; `down` verinizi silmez.
+Şema değişiklikleri açılışta koşullu `ALTER TABLE` ile uygulanır — kural kataloğu,
+referans verisi ve işyerleri **yalnızca eksik kayıtlar eklenerek** uzlaştırılır,
+mevcut veriye dokunulmaz. Bu nedenle güncelleme için veritabanını sıfırlamak gerekmez.
+
+### Docker'sız geliştirme
+
+Veri servislerini konteynerde bırakıp API'yi ve arayüzü yerelde çalıştırabilirsiniz.
+Bunun için .NET 10 SDK ve Node.js 20+ gerekir.
+
+```bash
+docker compose up -d db redis
+
+cd Backend/FraudGuard.API && dotnet run     # http://localhost:5217
+cd Client/react-ui && npm install && npm run dev
+```
+
+`appsettings.json` içindeki bağlantı dizeleri `localhost` üzerinden konteynerlere
+bakar; ek yapılandırma gerekmez.
 
 ---
 
